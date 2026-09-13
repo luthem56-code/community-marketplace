@@ -2,19 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Import our screens
+import 'screens/marketplace_feed_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // If you already have firebase_options.dart in your lib folder, 
-    // uncomment the line below and import it:
-    // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyDBx8pp3lY_O33LX75EqjrqIoT7XVBF4BM",
+      appId: "1:793038055925:web:b1b40249b87ad25b9958bc",
+      messagingSenderId: "793038055925",
+      projectId: "community-marketplace-59527",
+      storageBucket: "community-marketplace-59527.appspot.com",
+    ),
+  );
 
-    await Firebase.initializeApp();
-    debugPrint("✅ Firebase Initialized successfully!");
-  } catch (e, stackTrace) {
-    debugPrint("❌ Firebase initialization failed: $e");
-    debugPrint(stackTrace.toString());
+  if (FirebaseAuth.instance.currentUser == null) {
+    await FirebaseAuth.instance.signInAnonymously();
   }
 
   runApp(const CommunityMarketplaceApp());
@@ -30,24 +35,12 @@ class CommunityMarketplaceApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF008080), // Modern teal theme like Yaga
+          seedColor: const Color(0xFF008080), // Yaga-style teal
         ),
         useMaterial3: true,
       ),
-      // Set the home screen to your new CreateListingScreen
-      home: const CreateListingScreen(),
-    );
-  }
-}
-
-class CreateListingScreen extends StatelessWidget {
-  const CreateListingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Listing')),
-      body: const Center(child: Text('Create a listing')),
+      // Point home to the Marketplace Feed
+      home: const MarketplaceFeedScreen(),
     );
   }
 }
