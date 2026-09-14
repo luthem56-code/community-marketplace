@@ -15,7 +15,7 @@ void main() async {
       appId: "1:793038055925:web:b1b40249b87ad25b9958bc",
       messagingSenderId: "793038055925",
       projectId: "community-marketplace-59527",
-      storageBucket: "community-marketplace-59527.appspot.com",
+      storageBucket: "community-marketplace-59527.firebasestorage.app",
     ),
   );
 
