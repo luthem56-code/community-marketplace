@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/listing_model.dart';
 import 'listing_detail_screen.dart';
 import 'how_it_works_screen.dart';
+import 'help_center_screen.dart';
 import 'orders_screen.dart';
 import 'wallet_screen.dart';
 import 'create_listing_screen.dart';
@@ -263,6 +264,19 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  // Inside Drawer list items in marketplace_feed_screen.dart:
+          ListTile(
+            leading: const Icon(Icons.help_center_outlined, color: Color(0xFF008080)),
+            title: const Text('Help Center & Guides'),
+            subtitle: const Text('Buying, selling, safety & terms', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context); // Close drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+              );
+            },
+          ),
 
                   // Carousel Indicator Dots
                   Row(

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/listing_model.dart';
 import 'wallet_screen.dart';
+import 'help_center_screen.dart';
 import 'listing_detail_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -64,10 +65,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('My Closet & Profile', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+        title: const Text(
+          'My Closet & Profile',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0.5,
+        // Inside AppBar actions of user_profile_screen.dart:
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Colors.black),
+            tooltip: 'Help & Guides',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: Colors.black),
             onPressed: () {
