@@ -14,11 +14,10 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
-  // Navigation pages
   final List<Widget> _pages = [
     const MarketplaceFeedScreen(),
-    const _DirectoryPlaceholderScreen(), // Bridges to your existing directory!
-    const SizedBox(), // Placeholder for Sell button (intercepted in onTap)
+    const _CommunityPlaceholderScreen(), // Clean placeholder parked for later
+    const SizedBox(), // Intercepted for Sell (+)
     const OrdersScreen(),
     const WalletScreen(),
   ];
@@ -44,7 +43,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) {
-            // When the user taps the center (+) button, open the Sell wizard as a full modal
             if (index == 2) {
               Navigator.push(
                 context,
@@ -65,7 +63,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             const BottomNavigationBarItem(
               icon: Icon(Icons.storefront_outlined),
               activeIcon: Icon(Icons.storefront),
-              label: 'Shop',
+              label: 'Market',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
@@ -86,7 +84,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             const BottomNavigationBarItem(
               icon: Icon(Icons.local_mall_outlined),
               activeIcon: Icon(Icons.local_mall),
-              label: 'Orders',
+              label: 'Orders & Offers',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.account_balance_wallet_outlined),
@@ -100,15 +98,15 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 }
 
-// Temporary placeholder for your existing Community Directory module
-class _DirectoryPlaceholderScreen extends StatelessWidget {
-  const _DirectoryPlaceholderScreen();
+class _CommunityPlaceholderScreen extends StatelessWidget {
+  const _CommunityPlaceholderScreen();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Community Directory', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Community Network', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
@@ -118,15 +116,12 @@ class _DirectoryPlaceholderScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.home_work_outlined, size: 64, color: Color(0xFF008080)),
+              const Icon(Icons.church_outlined, size: 64, color: Color(0xFF008080)),
               const SizedBox(height: 16),
-              const Text(
-                'Your Existing Directory',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('PMB Community Hub', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(
-                'We can connect your current community member list, local business listings, or neighborhood directory right here!',
+                'Ready to be linked to your local church and community network.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600),
               ),

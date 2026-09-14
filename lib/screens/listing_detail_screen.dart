@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/listing_model.dart';
 import 'checkout_screen.dart';
+import 'seller_shop_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
+import '../models/offer_model.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -180,6 +185,63 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // --- Seller Profile Card (Yaga-style) ---
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SellerShopScreen(
+                            sellerId: item.sellerId,
+                            shopName: 'Neighbor Closet',
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 22,
+                            backgroundColor: Color(0xFF008080),
+                            child: Icon(Icons.person, color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Neighbor Closet',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(Icons.verified, size: 12, color: Color(0xFF008080)),
+                                    SizedBox(width: 3),
+                                    Text(
+                                      'Verified Resident • 5.0 ⭐ (14 sales)',
+                                      style: TextStyle(fontSize: 11, color: Colors.black54),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, color: Colors.black45),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                   // --- 5. Buyer Protection Box (Yaga trust guarantee) ---
                   Container(
@@ -319,6 +381,21 @@ child: ElevatedButton(
 
   void _showMakeOfferDialog(BuildContext context, ListingModel item) {
     final offerController = TextEditingController();
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to make an offer.')),
+      );
+      return;
+    }
+
+    if (currentUser.uid == item.sellerId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot make an offer on your own listing!')),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -343,17 +420,17 @@ child: ElevatedButton(
             ),
             const SizedBox(height: 6),
             Text(
-              'Listed price: R ${item.price.toStringAsFixed(0)}. Reasonable offers are more likely to be accepted.',
+              'Listed price: R ${item.price.toStringAsFixed(0)}. Realistic offers (within 20-30%) are most likely to be accepted.',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: offerController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: const InputDecoration(
                 prefixText: 'R ',
-                labelText: 'Your Offer (ZAR)',
+                labelText: 'Your Offer (ZAR) *',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -366,13 +443,50 @@ child: ElevatedButton(
                   backgroundColor: const Color(0xFF008080),
                   foregroundColor: Colors.white,
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  final offeredAmount = double.tryParse(offerController.text.trim()) ?? 0.0;
+
+                  // Minimum offer threshold: at least 40% of listed price
+                  if (offeredAmount < (item.price * 0.4) || offeredAmount >= item.price) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Offer must be between R${(item.price * 0.4).toStringAsFixed(0)} and R${(item.price - 1).toStringAsFixed(0)}',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Offer of R${offerController.text} sent to seller!'),
-                    ),
+
+                  final offerId = const Uuid().v4();
+                  final newOffer = OfferModel(
+                    offerId: offerId,
+                    listingId: item.id,
+                    itemTitle: item.title,
+                    itemImageUrl: item.imageUrls.isNotEmpty ? item.imageUrls.first : '',
+                    originalPrice: item.price,
+                    offeredPrice: offeredAmount,
+                    buyerId: currentUser.uid,
+                    sellerId: item.sellerId,
+                    status: OfferStatus.pending,
+                    createdAt: DateTime.now(),
                   );
+
+                  await FirebaseFirestore.instance
+                      .collection('offers')
+                      .doc(offerId)
+                      .set(newOffer.toMap());
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: const Color(0xFF008080),
+                        content: Text('Offer of R${offeredAmount.toStringAsFixed(2)} submitted to seller! 🎉'),
+                      ),
+                    );
+                  }
                 },
                 child: const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
