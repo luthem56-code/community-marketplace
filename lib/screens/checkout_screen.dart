@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-
+import '../widgets/delivery_info_sheet.dart';
 import '../models/listing_model.dart';
 import '../models/order_model.dart';
 
@@ -230,6 +230,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 20),
 
                     // --- 2. Delivery Selection ---
+                    // Inside CheckoutScreen: Delivery Selection
                     const Text('Select Delivery Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
                     ...item.shippingOptions.where((opt) => opt.isEnabled).map((opt) {
@@ -247,8 +248,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: RadioListTile<ShippingOption>(
                           activeColor: const Color(0xFF008080),
-                          title: Text(opt.method, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                          subtitle: Text('R ${opt.price.toStringAsFixed(2)}'),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(opt.method, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              ),
+                              // --- YAGA (?) INFO BUTTON ---
+                              IconButton(
+                                icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
+                                tooltip: 'How this courier works',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  DeliveryInfoSheet.show(context, opt.method);
+                                },
+                              ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            opt.price == 0 ? 'FREE (R 0.00)' : 'R ${opt.price.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: opt.price == 0 ? Colors.green.shade800 : Colors.black87,
+                              fontWeight: opt.price == 0 ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
                           value: opt,
                           groupValue: _selectedShipping,
                           onChanged: (val) {
@@ -257,7 +280,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       );
                     }),
-                    const SizedBox(height: 20),
 
                     // --- 3. Delivery Details Form ---
                     const Text('Delivery & Recipient Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

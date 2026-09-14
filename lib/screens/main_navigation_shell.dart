@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'marketplace_feed_screen.dart';
 import 'create_listing_screen.dart';
+import 'user_profile_screen.dart';
 import 'orders_screen.dart';
 import 'wallet_screen.dart';
 
@@ -20,6 +21,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     const SizedBox(), // Intercepted for Sell (+)
     const OrdersScreen(),
     const WalletScreen(),
+    const UserProfileScreen(), // <-- NEW: Closet & Profile 
   ];
 
   @override
@@ -87,9 +89,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               label: 'Orders & Offers',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              activeIcon: Icon(Icons.account_balance_wallet),
-              label: 'Wallet',
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'My Closet',
             ),
           ],
         ),

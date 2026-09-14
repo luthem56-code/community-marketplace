@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/listing_model.dart';
+import 'chat_screen.dart';
 import 'checkout_screen.dart';
+import 'package:flutter/services.dart';
 import 'seller_shop_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'how_it_works_screen.dart';
 import 'package:uuid/uuid.dart';
 import '../models/offer_model.dart';
 
@@ -18,6 +21,134 @@ class ListingDetailScreen extends StatefulWidget {
 
 class _ListingDetailScreenState extends State<ListingDetailScreen> {
   int _currentImageIndex = 0;
+  void _showShareSheet(BuildContext context, ListingModel item) {
+    final shareText = 'Check out this "${item.title}" on PMB Community Market for only R${item.price.toStringAsFixed(0)}! 👗👕\n\n100% Escrow Protected with Local PMB Collection & Pudo delivery.';
+void _showShareSheet(BuildContext context, ListingModel item) {
+    final shareText = 'Check out this "${item.title}" on PMB Community Market for only R${item.price.toStringAsFixed(0)}! 👗👕\n\n100% Escrow Protected with Local PMB Collection & Pudo delivery.';
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Share this Listing',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // 1. Copy Link Option
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE6F2F2),
+                child: Icon(Icons.link, color: Color(0xFF008080)),
+              ),
+              title: const Text('Copy Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Copy listing details to clipboard'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Color(0xFF008080),
+                    content: Text('Listing link copied to clipboard! 📋'),
+                  ),
+                );
+              },
+            ),
+
+            // 2. Share via WhatsApp Option
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F5E9),
+                child: Icon(Icons.chat, color: Colors.green),
+              ),
+              title: const Text('Share on WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Send to PMB community & church groups'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Colors.green,
+                    content: Text('Text copied! Paste it directly into your WhatsApp chat.'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Share this Listing',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // 1. Copy Link Option
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE6F2F2),
+                child: Icon(Icons.link, color: Color(0xFF008080)),
+              ),
+              title: const Text('Copy Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Copy listing details to clipboard'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Color(0xFF008080),
+                    content: Text('Listing link copied to clipboard! 📋'),
+                  ),
+                );
+              },
+            ),
+            
+
+            // 2. Share via WhatsApp Option
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFE8F5E9),
+                child: Icon(Icons.chat, color: Colors.green),
+              ),
+              title: const Text('Share on WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Send to PMB community & church groups'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Colors.green,
+                    content: Text('Text copied! Paste it directly into your WhatsApp chat.'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +166,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.black),
-            onPressed: () {
-              // Share item link
-            },
+            tooltip: 'Share Item',
+            onPressed: () => _showShareSheet(context, item),
           ),
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.black),
@@ -243,42 +373,57 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // --- 5. Buyer Protection Box (Yaga trust guarantee) ---
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE6F2F2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Community Buyer Protection',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF008080),
+                  
+                  // --- 5. Buyer Protection Box ---
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HowItWorksScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6F2F2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Community Buyer Protection',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF008080),
+                                      ),
+                                    ),
+                                    Spacer(),
+                                    Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF008080)),
+                                  ],
                                 ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Money is held securely in escrow. Funds are only released to the seller after you receive and confirm your item.',
-                                style: TextStyle(fontSize: 12, color: Colors.black87),
-                              ),
-                            ],
+                                SizedBox(height: 2),
+                                Text(
+                                  'Money is held securely in escrow. Funds are only released after you receive and confirm your item. Tap to learn how it works.',
+                                  style: TextStyle(fontSize: 12, color: Colors.black87),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
                 ],
               ),
             ),
@@ -302,15 +447,32 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         child: SafeArea(
           child: Row(
             children: [
-              // "Make an Offer" button
+              // 1. Message Seller Button (NEW)
+              IconButton(
+                style: IconButton.styleFrom(
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.all(12),
+                ),
+                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF008080)),
+                tooltip: 'Message Seller',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        listing: item,
+                        otherUserId: item.sellerId,
+                        otherUserName: 'Seller Closet',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 2,
                 child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Color(0xFF008080), width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
                   onPressed: () {
                     _showMakeOfferDialog(context, item);
                   },

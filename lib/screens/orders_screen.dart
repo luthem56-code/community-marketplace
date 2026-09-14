@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/offer_model.dart';
 import '../models/listing_model.dart';
+import 'raise_dispute_screen.dart';
 import 'checkout_screen.dart';
 
 class OrdersScreen extends StatelessWidget {
@@ -273,9 +274,12 @@ class _OrdersList extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           itemCount: docs.length,
           itemBuilder: (context, index) {
-            final orderData = docs[index].data() as Map<String, dynamic>;
-            final orderDocId = docs[index].id;
-            return _OrderCard(orderId: orderDocId, order: orderData, isSeller: isSellerView);
+            final doc = docs[index];
+            return _OrderCard(
+              orderId: doc.id,
+              order: doc.data() as Map<String, dynamic>,
+              isSeller: isSellerView,
+            );
           },
         );
       },
@@ -288,7 +292,11 @@ class _OrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
   final bool isSeller;
 
-  const _OrderCard({required this.orderId, required this.order, required this.isSeller});
+  const _OrderCard({
+    required this.orderId,
+    required this.order,
+    required this.isSeller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -307,18 +315,42 @@ class _OrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- 1. Order ID & Status Chip ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Order #${orderId.substring(0, 8).toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54)),
+                Text(
+                  'Order #${orderId.substring(0, 8).toUpperCase()}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54),
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFF008080).withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-                  child: Text(status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+                  decoration: BoxDecoration(
+                    color: status == 'disputed'
+                        ? Colors.red.shade50
+                        : status == 'completed'
+                            ? Colors.green.shade50
+                            : const Color(0xFF008080).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    status == 'disputed' ? 'DISPUTED (FROZEN)' : status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: status == 'disputed'
+                          ? Colors.red.shade700
+                          : status == 'completed'
+                              ? Colors.green.shade800
+                              : const Color(0xFF008080),
+                    ),
+                  ),
                 ),
               ],
             ),
             const Divider(height: 16),
+
+            // --- 2. Item Image & Details ---
             Row(
               children: [
                 ClipRRect(
@@ -332,11 +364,22 @@ class _OrderCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(order['itemTitle'] ?? 'Item', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1),
-                      const SizedBox(height: 4),
-                      Text('Method: ${order['shippingMethod']}', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
                       Text(
-                        isSeller ? 'Your Payout: R${sellerEarnings.toStringAsFixed(2)}' : 'Paid Total: R${(order['totalAmount'] as num?)?.toStringAsFixed(2)}',
+                        order['itemTitle'] ?? 'Item',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Method: ${order['shippingMethod']}',
+                        style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isSeller
+                            ? 'Your Payout: R${sellerEarnings.toStringAsFixed(2)}'
+                            : 'Paid Total: R${(order['totalAmount'] as num?)?.toStringAsFixed(2)}',
                         style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF008080), fontSize: 14),
                       ),
                     ],
@@ -345,39 +388,149 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+
+            // --- 3. Delivery Details Card ---
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.grey.shade200)),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Deliver To: ${order['recipientName']} (${order['recipientPhone']})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Destination: ${order['deliveryDetails']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                  if (trackingNumber != null && trackingNumber.isNotEmpty)
-                    Text('Waybill/PIN: $trackingNumber', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+                  Text(
+                    'Deliver To: ${order['recipientName']} (${order['recipientPhone']})',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Destination: ${order['deliveryDetails']}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  if (trackingNumber != null && trackingNumber.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Waybill/PIN: $trackingNumber',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF008080)),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 12),
+
+            // --- 4. DISPUTE BANNER: When escrow is locked ---
+            if (status == 'disputed')
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Escrow Payout Frozen',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900, fontSize: 13),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isSeller
+                                ? 'The buyer reported an issue. Funds are held safely in escrow while our community team reviews the evidence.'
+                                : 'You opened a dispute. Your money is locked safely in escrow while the issue is being resolved.',
+                            style: TextStyle(fontSize: 12, color: Colors.red.shade800),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // --- 5. SELLER ACTION: Add tracking and mark shipped ---
             if (isSeller && status == 'paidEscrowHeld')
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF008080),
+                    foregroundColor: Colors.white,
+                  ),
                   icon: const Icon(Icons.local_shipping, size: 18),
                   label: const Text('Mark Shipped & Add Waybill'),
                   onPressed: () => _showAddTracking(context),
                 ),
               ),
+
+            // --- 6. BUYER ACTIONS: When parcel is shipped / in transit ---
             if (!isSeller && status == 'shipped')
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text('Item Received & All Good (Release Funds)'),
-                  onPressed: () => _confirmReceipt(context, sellerEarnings),
+              Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Item Received & All Good (Release Funds)'),
+                      onPressed: () => _confirmReceipt(context, sellerEarnings),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                      icon: const Icon(Icons.report_problem_outlined, size: 16),
+                      label: const Text('Something wrong with item? Report issue', style: TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RaiseDisputeScreen(
+                              orderId: orderId,
+                              buyerId: order['buyerId'] ?? '',
+                              sellerId: order['sellerId'] ?? '',
+                              itemTitle: order['itemTitle'] ?? 'Item',
+                              totalAmount: (order['totalAmount'] as num?)?.toDouble() ?? 0.0,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+
+            // --- 7. COMPLETED BADGE ---
+            if (status == 'completed')
+              Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.verified, size: 16, color: Colors.green.shade700),
+                    const SizedBox(width: 4),
+                    Text(
+                      isSeller ? 'Escrow funds released to your wallet!' : 'Order completed & verified.',
+                      style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -392,13 +545,26 @@ class _OrderCard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Enter Courier Waybill / PIN'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Tracking Code *', hintText: 'PUDO-123456')),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Tracking Code *',
+            hintText: 'e.g. PUDO-123456 or PAXI-789',
+          ),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF008080),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               if (ctrl.text.trim().isEmpty) return;
-              await FirebaseFirestore.instance.collection('orders').doc(orderId).update({'status': 'shipped', 'trackingNumber': ctrl.text.trim()});
+              await FirebaseFirestore.instance
+                  .collection('orders')
+                  .doc(orderId)
+                  .update({'status': 'shipped', 'trackingNumber': ctrl.text.trim()});
               if (context.mounted) Navigator.pop(ctx);
             },
             child: const Text('Confirm Shipped'),
@@ -413,11 +579,16 @@ class _OrderCard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Receipt & Release Funds?'),
-        content: Text('This releases R${payout.toStringAsFixed(2)} directly to the seller.'),
+        content: Text(
+          'Are you happy with the item?\n\nConfirming will release R${payout.toStringAsFixed(2)} directly from escrow to the seller.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Not Yet')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               final batch = FirebaseFirestore.instance.batch();
               batch.update(FirebaseFirestore.instance.collection('orders').doc(orderId), {'status': 'completed'});

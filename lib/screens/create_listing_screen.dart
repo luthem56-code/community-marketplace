@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:community_marketplace/widgets/delivery_info_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,16 +33,28 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
   String _selectedCategory = 'Women';
   ItemCondition _selectedCondition = ItemCondition.good;
+  bool _allowBundling = true;
 
+  // --- YAGA COURIER STATE ---
+  // 1. The Courier Guy Locker & Kiosk (Pudo)
+  bool _enableCourierGuy = true;
+  double _courierGuyPrice = 64.0;
+  String _courierGuySize = 'Small (600x410x80 mm)';
 
-  // Preset South African Shipping Options (With Local Community Collection!)
-  final List<ShippingOption> _shippingOptions = [
-    ShippingOption(method: 'Local Community Pickup / Meetup', price: 0.00, isEnabled: true),
-    ShippingOption(method: 'Pudo Locker (The Courier Guy)', price: 60.00, isEnabled: true),
-    ShippingOption(method: 'PAXI (PEP Stores to PEP)', price: 59.95, isEnabled: true),
-    ShippingOption(method: 'PostNet-to-PostNet', price: 109.00, isEnabled: false),
-    ShippingOption(method: 'Door-to-Door Courier', price: 100.00, isEnabled: false),
-  ];
+  // 2. Pargo Store-to-Store
+  bool _enablePargo = false;
+  double _pargoPrice = 59.0;
+  String _pargoSize = 'Small parcel (up to 5kg)';
+
+  // 3. PAXI Speed Service (PEP)
+  bool _enablePaxi = true;
+  double _paxiPrice = 49.0;
+  String _paxiSize = 'Standard parcel (450x370 mm)';
+
+  // 4. Fixed Couriers
+  bool _enablePostNet = false;
+  bool _enableAramex = false;
+  bool _enablePickup = true; // Free Local PMB Collection
 
   final List<String> _categories = [
     'Women',
@@ -49,21 +62,28 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     'Kids & Babies',
     'Beauty & Care',
     'Accessories',
+    'Shoes',
     'Home',
   ];
 
-  Future<void> _pickImages() async {
-    if (_selectedImages.length >= 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 6 photos allowed')),
-      );
-      return;
-    }
+  final List<String> _photoSlotNames = [
+    'Cover photo *',
+    'Different angle',
+    'Brand/Size Label',
+    'Detail / Flaw',
+    'Extra photo',
+    'Extra photo',
+  ];
 
-    final List<XFile> picked = await _picker.pickMultiImage(limit: 6 - _selectedImages.length);
-    if (picked.isNotEmpty) {
+  Future<void> _pickImageForSlot(int slotIndex) async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
       setState(() {
-        _selectedImages.addAll(picked.map((x) => File(x.path)));
+        if (slotIndex < _selectedImages.length) {
+          _selectedImages[slotIndex] = File(picked.path);
+        } else {
+          _selectedImages.add(File(picked.path));
+        }
       });
     }
   }
@@ -79,14 +99,14 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
 
     if (_selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one photo.')),
+        const SnackBar(content: Text('Please add at least a cover photo.')),
       );
       return;
     }
 
-    if (!_shippingOptions.any((opt) => opt.isEnabled)) {
+    if (!_enableCourierGuy && !_enablePargo && !_enablePaxi && !_enablePostNet && !_enableAramex && !_enablePickup) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enable at least one shipping method.')),
+        const SnackBar(content: Text('Please enable at least one delivery option.')),
       );
       return;
     }
@@ -96,13 +116,45 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Upload & compress images
       final uploadedUrls = await _mediaService.uploadListingImages(
         images: _selectedImages,
         sellerId: user.uid,
       );
 
-      // 2. Generate listing model
+      // Build active delivery options matrix with selected parcel sizes
+      final List<ShippingOption> activeShipping = [];
+
+      if (_enableCourierGuy) {
+        activeShipping.add(ShippingOption(
+          method: 'The Courier Guy Locker ($_courierGuySize)',
+          price: _courierGuyPrice,
+          isEnabled: true,
+        ));
+      }
+      if (_enablePargo) {
+        activeShipping.add(ShippingOption(
+          method: 'Pargo Store-to-Store ($_pargoSize)',
+          price: _pargoPrice,
+          isEnabled: true,
+        ));
+      }
+      if (_enablePaxi) {
+        activeShipping.add(ShippingOption(
+          method: 'PAXI Speed Service ($_paxiSize)',
+          price: _paxiPrice,
+          isEnabled: true,
+        ));
+      }
+      if (_enablePostNet) {
+        activeShipping.add(ShippingOption(method: 'PostNet-to-PostNet', price: 109.0, isEnabled: true));
+      }
+      if (_enableAramex) {
+        activeShipping.add(ShippingOption(method: 'Aramex Store-to-Door', price: 99.99, isEnabled: true));
+      }
+      if (_enablePickup) {
+        activeShipping.add(ShippingOption(method: 'Pick up from Seller (Local PMB Collection)', price: 0.0, isEnabled: true));
+      }
+
       final listingId = const Uuid().v4();
       final newListing = ListingModel(
         id: listingId,
@@ -116,15 +168,14 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         condition: _selectedCondition,
         price: double.parse(_priceController.text.trim()),
         imageUrls: uploadedUrls,
-        shippingOptions: _shippingOptions.where((s) => s.isEnabled).toList(),
+        shippingOptions: activeShipping,
         createdAt: DateTime.now(),
       );
 
-      // 3. Save to Cloud Firestore
-      await FirebaseFirestore.instance
-          .collection('listings')
-          .doc(listingId)
-          .set(newListing.toMap());
+      await FirebaseFirestore.instance.collection('listings').doc(listingId).set({
+        ...newListing.toMap(),
+        'allowBundling': _allowBundling,
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -153,17 +204,24 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
-        title: const Text('Sell an Item', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Sell an Item', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
+                  CircularProgressIndicator(color: Color(0xFF008080)),
                   SizedBox(height: 16),
-                  Text('Uploading & processing images...'),
+                  Text('Publishing listing to marketplace...'),
                 ],
               ),
             )
@@ -174,70 +232,119 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- Photo Uploader Grid ---
-                    const Text('Photos (Up to 6)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
+                    // --- SECTION 1: UPLOAD PHOTOS ---
+                    const Text('Upload photos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    const Text('First photo is your cover picture. Add up to 6 photos.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                    const SizedBox(height: 12),
+
                     SizedBox(
-                      height: 100,
-                      child: ListView(
+                      height: 110,
+                      child: ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        children: [
-                          GestureDetector(
-                            onTap: _pickImages,
-                            child: Container(
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade400),
+                        itemCount: 6,
+                        itemBuilder: (context, index) {
+                          final hasImage = index < _selectedImages.length;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: GestureDetector(
+                              onTap: () => _pickImageForSlot(index),
+                              child: Container(
+                                width: 95,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: index == 0 ? const Color(0xFF008080) : Colors.grey.shade300,
+                                    width: index == 0 ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: hasImage
+                                    ? Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(7),
+                                            child: Image.file(_selectedImages[index], fit: BoxFit.cover),
+                                          ),
+                                          Positioned(
+                                            top: 2,
+                                            right: 2,
+                                            child: GestureDetector(
+                                              onTap: () => setState(() => _selectedImages.removeAt(index)),
+                                              child: const CircleAvatar(
+                                                radius: 10,
+                                                backgroundColor: Colors.black54,
+                                                child: Icon(Icons.close, size: 12, color: Colors.white),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            index == 0 ? Icons.add_a_photo : Icons.add_photo_alternate_outlined,
+                                            color: index == 0 ? const Color(0xFF008080) : Colors.grey.shade400,
+                                            size: 26,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _photoSlotNames[index],
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: index == 0 ? const Color(0xFF008080) : Colors.grey.shade600,
+                                              fontWeight: index == 0 ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               ),
-                              child: const Icon(Icons.add_a_photo, size: 32, color: Colors.black54),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Photo Tips Banner
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6F2F2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline, color: Color(0xFF008080), size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Sell better with our photo tips: Use bright natural daylight, show the brand/size label, and capture flaws clearly.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF004D40)),
                             ),
                           ),
-                          ..._selectedImages.asMap().entries.map((entry) {
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.file(
-                                      entry.value,
-                                      width: 100,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 2,
-                                    right: 2,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _selectedImages.removeAt(entry.key)),
-                                      child: const CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: Colors.black54,
-                                        child: Icon(Icons.close, size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                    // --- Item Details ---
+                    // --- SECTION 2: ITEM DETAILS ---
+                    const Text('Item details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+
                     TextFormField(
                       controller: _titleController,
                       decoration: const InputDecoration(
                         labelText: 'Title *',
                         hintText: 'e.g. Vintage Denim Jacket',
+                        filled: true,
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) => val == null || val.isEmpty ? 'Please enter a title' : null,
+                      validator: (val) => val == null || val.isEmpty ? 'Title required' : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -246,19 +353,20 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       maxLines: 3,
                       decoration: const InputDecoration(
                         labelText: 'Description *',
-                        hintText: 'Describe flaws, fit, material...',
+                        hintText: 'Describe flaws, fit, material, measurements...',
+                        filled: true,
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(),
                       ),
-                      validator: (val) => val == null || val.isEmpty ? 'Please enter a description' : null,
+                      validator: (val) => val == null || val.isEmpty ? 'Description required' : null,
                     ),
                     const SizedBox(height: 12),
 
-                    // Category Dropdown
                     DropdownButtonFormField<String>(
                       value: _selectedCategory,
-                      decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                      items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
-                      onChanged: (val) => setState(() => _selectedCategory = val!),
+                      decoration: const InputDecoration(labelText: 'Category *', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setState(() => _selectedCategory = v!),
                     ),
                     const SizedBox(height: 12),
 
@@ -267,37 +375,289 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         Expanded(
                           child: TextFormField(
                             controller: _brandController,
-                            decoration: const InputDecoration(labelText: 'Brand', hintText: 'Zara, Cotton On...', border: OutlineInputBorder()),
+                            decoration: const InputDecoration(labelText: 'Brand', hintText: 'Zara, Cotton On...', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: TextFormField(
                             controller: _sizeController,
-                            decoration: const InputDecoration(labelText: 'Size *', hintText: 'M, 34, UK 6...', border: OutlineInputBorder()),
-                            validator: (val) => val == null || val.isEmpty ? 'Enter size' : null,
+                            decoration: const InputDecoration(labelText: 'Size *', hintText: 'M, 34, UK 6...', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                            validator: (val) => val == null || val.isEmpty ? 'Size required' : null,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // Condition Dropdown
                     DropdownButtonFormField<ItemCondition>(
                       value: _selectedCondition,
-                      decoration: const InputDecoration(labelText: 'Condition', border: OutlineInputBorder()),
-                      items: ItemCondition.values.map((cond) => DropdownMenuItem(value: cond, child: Text(cond.label))).toList(),
-                      onChanged: (val) => setState(() => _selectedCondition = val!),
+                      decoration: const InputDecoration(labelText: 'Condition *', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                      items: ItemCondition.values.map((c) => DropdownMenuItem(value: c, child: Text(c.label))).toList(),
+                      onChanged: (v) => setState(() => _selectedCondition = v!),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // --- SECTION 3: YAGA DELIVERY MATRIX ---
+                    const Text('Delivery', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Select as many as you like. Shops with multiple options sell faster. The Buyer will cover the delivery fee when purchasing.',
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. The Courier Guy Locker & Kiosk (Pudo)
+                    _courierCard(
+                      title: 'The Courier Guy Locker & Kiosk',
+                      subtitle: 'We will provide you with the deposit PIN code once you are ready to ship out the order.',
+                      isEnabled: _enableCourierGuy,
+                      onToggle: (v) => setState(() => _enableCourierGuy = v),
+                      body: Column(
+                        children: [
+                          _sizeRadio(
+                            label: 'Extra-Small (600x170x80 mm)',
+                            price: 53.0,
+                            groupVal: _courierGuyPrice,
+                            onSelect: (p) => setState(() {
+                              _courierGuyPrice = p;
+                              _courierGuySize = 'Extra-Small (600x170x80 mm)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Small (600x410x80 mm)',
+                            price: 64.0,
+                            groupVal: _courierGuyPrice,
+                            onSelect: (p) => setState(() {
+                              _courierGuyPrice = p;
+                              _courierGuySize = 'Small (600x410x80 mm)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Medium (600x410x190 mm)',
+                            price: 74.0,
+                            groupVal: _courierGuyPrice,
+                            onSelect: (p) => setState(() {
+                              _courierGuyPrice = p;
+                              _courierGuySize = 'Medium (600x410x190 mm)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Large (600x410x410 mm)',
+                            price: 94.0,
+                            groupVal: _courierGuyPrice,
+                            onSelect: (p) => setState(() {
+                              _courierGuyPrice = p;
+                              _courierGuySize = 'Large (600x410x410 mm)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Extra-Large (600x410x690 mm)',
+                            price: 149.0,
+                            groupVal: _courierGuyPrice,
+                            onSelect: (p) => setState(() {
+                              _courierGuyPrice = p;
+                              _courierGuySize = 'Extra-Large (600x410x690 mm)';
+                            }),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Price (ZAR)
+                    // 2. Pargo Store-to-Store
+                    _courierCard(
+                      title: 'Pargo Store-to-Store',
+                      subtitle: 'We will provide you with the necessary Pargo PIN. Simply drop off at your nearest Pargo Point.',
+                      isEnabled: _enablePargo,
+                      onToggle: (v) => setState(() => _enablePargo = v),
+                      body: Column(
+                        children: [
+                          _sizeRadio(
+                            label: 'Extra-Small parcel (up to 2kg)',
+                            price: 49.0,
+                            groupVal: _pargoPrice,
+                            onSelect: (p) => setState(() {
+                              _pargoPrice = p;
+                              _pargoSize = 'Extra-Small parcel (up to 2kg)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Small parcel (up to 5kg)',
+                            price: 59.0,
+                            groupVal: _pargoPrice,
+                            onSelect: (p) => setState(() {
+                              _pargoPrice = p;
+                              _pargoSize = 'Small parcel (up to 5kg)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Medium parcel (up to 10kg)',
+                            price: 69.0,
+                            groupVal: _pargoPrice,
+                            onSelect: (p) => setState(() {
+                              _pargoPrice = p;
+                              _pargoSize = 'Medium parcel (up to 10kg)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Large parcel (up to 15kg)',
+                            price: 89.0,
+                            groupVal: _pargoPrice,
+                            onSelect: (p) => setState(() {
+                              _pargoPrice = p;
+                              _pargoSize = 'Large parcel (up to 15kg)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Extra-Large parcel (up to 20kg)',
+                            price: 99.0,
+                            groupVal: _pargoPrice,
+                            onSelect: (p) => setState(() {
+                              _pargoPrice = p;
+                              _pargoSize = 'Extra-Large parcel (up to 20kg)';
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 3. PAXI Speed Service
+                    _courierCard(
+                      title: 'Paxi Speed Service',
+                      subtitle: 'We will provide you with the PAXI token and bag voucher to ship at any PEP store.',
+                      isEnabled: _enablePaxi,
+                      onToggle: (v) => setState(() => _enablePaxi = v),
+                      body: Column(
+                        children: [
+                          _sizeRadio(
+                            label: 'Standard parcel (450x370 mm)',
+                            price: 49.0,
+                            groupVal: _paxiPrice,
+                            onSelect: (p) => setState(() {
+                              _paxiPrice = p;
+                              _paxiSize = 'Standard parcel (450x370 mm)';
+                            }),
+                          ),
+                          _sizeRadio(
+                            label: 'Large parcel (640x510 mm)',
+                            price: 60.0,
+                            groupVal: _paxiPrice,
+                            onSelect: (p) => setState(() {
+                              _paxiPrice = p;
+                              _paxiSize = 'Large parcel (640x510 mm)';
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 4. Other Standard SA Couriers (With (?) Help Icons)
+                    Card(
+                      elevation: 0.5,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            activeColor: const Color(0xFF008080),
+                            title: Row(
+                              children: [
+                                const Expanded(
+                                  child: Text('PostNet-to-PostNet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
+                                  tooltip: 'How PostNet works',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => DeliveryInfoSheet.show(context, 'PostNet-to-PostNet'),
+                                ),
+                              ],
+                            ),
+                            subtitle: const Text('Flat rate: R 109.00'),
+                            value: _enablePostNet,
+                            onChanged: (v) => setState(() => _enablePostNet = v),
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            activeColor: const Color(0xFF008080),
+                            title: Row(
+                              children: [
+                                const Expanded(
+                                  child: Text('Aramex Store-to-Door', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
+                                  tooltip: 'How Aramex works',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => DeliveryInfoSheet.show(context, 'Aramex Store-to-Door'),
+                                ),
+                              ],
+                            ),
+                            subtitle: const Text('Flat rate: R 99.99'),
+                            value: _enableAramex,
+                            onChanged: (v) => setState(() => _enableAramex = v),
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            activeColor: const Color(0xFF008080),
+                            title: Row(
+                              children: [
+                                const Expanded(
+                                  child: Text('Pick up from Seller (Free Collection)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
+                                  tooltip: 'How Community Pickup works safely',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => DeliveryInfoSheet.show(context, 'Local Community Pickup'),
+                                ),
+                              ],
+                            ),
+                            subtitle: const Text('Local PMB / church meetup (R 0.00)'),
+                            value: _enablePickup,
+                            onChanged: (v) => setState(() => _enablePickup = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // --- SECTION 4: BUNDLING ---
+                    Card(
+                      elevation: 0.5,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      child: SwitchListTile(
+                        activeColor: const Color(0xFF008080),
+                        title: const Text('Bundling', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: const Text('Allow buyers to bundle multiple items from your shop to pay only 1 delivery fee.'),
+                        value: _allowBundling,
+                        onChanged: (v) => setState(() => _allowBundling = v),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- SECTION 5: PRICE & 0% SELLER COMMISSION ---
+                    const Text('Price', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'This is the amount you will receive. Selling is 100% free with 0% commission.',
+                      style: TextStyle(color: Color(0xFF008080), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+
                     TextFormField(
                       controller: _priceController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(
                         prefixText: 'R ',
-                        labelText: 'Price (ZAR) *',
+                        labelText: 'Item price (ZAR) *',
+                        filled: true,
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(),
                       ),
                       validator: (val) {
@@ -306,32 +666,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
-
-                    // --- South African Shipping Options ---
-                    const Text('Delivery Options (Enable at least one)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    ..._shippingOptions.asMap().entries.map((entry) {
-                      final opt = entry.value;
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: SwitchListTile(
-                          title: Text(opt.method),
-                          subtitle: Text('Flat rate: R${opt.price.toStringAsFixed(2)}'),
-                          value: opt.isEnabled,
-                          onChanged: (bool enabled) {
-                            setState(() {
-                              _shippingOptions[entry.key] = ShippingOption(
-                                method: opt.method,
-                                price: opt.price,
-                                isEnabled: enabled,
-                              );
-                            });
-                          },
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 30),
 
                     // Submit Button
                     SizedBox(
@@ -339,7 +674,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                       height: 52,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).primaryColor,
+                          backgroundColor: const Color(0xFF008080),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
@@ -347,10 +682,80 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         child: const Text('Publish Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _courierCard({
+    required String title,
+    required String subtitle,
+    required bool isEnabled,
+    required ValueChanged<bool> onToggle,
+    required Widget body,
+  }) {
+    return Card(
+      elevation: 0.5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: isEnabled ? const Color(0xFF008080).withOpacity(0.4) : Colors.transparent),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            activeColor: const Color(0xFF008080),
+            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+            value: isEnabled,
+            onChanged: onToggle,
+          ),
+          if (isEnabled) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: body,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _sizeRadio({
+    required String label,
+    required double price,
+    required double groupVal,
+    required ValueChanged<double> onSelect,
+  }) {
+    final isSelected = groupVal == price;
+    return InkWell(
+      onTap: () => onSelect(price),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            Radio<double>(
+              value: price,
+              groupValue: groupVal,
+              activeColor: const Color(0xFF008080),
+              onChanged: (v) {
+                if (v != null) onSelect(v);
+              },
+            ),
+            Expanded(
+              child: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+            ),
+            Text(
+              '+ R ${price.toStringAsFixed(0)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF008080)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
