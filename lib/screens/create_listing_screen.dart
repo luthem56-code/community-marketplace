@@ -33,8 +33,10 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   String _selectedCategory = 'Women';
   ItemCondition _selectedCondition = ItemCondition.good;
 
-  // Preset South African Shipping Options (Standard Yaga defaults)
+
+  // Preset South African Shipping Options (With Local Community Collection!)
   final List<ShippingOption> _shippingOptions = [
+    ShippingOption(method: 'Local Community Pickup / Meetup', price: 0.00, isEnabled: true),
     ShippingOption(method: 'Pudo Locker (The Courier Guy)', price: 60.00, isEnabled: true),
     ShippingOption(method: 'PAXI (PEP Stores to PEP)', price: 59.95, isEnabled: true),
     ShippingOption(method: 'PostNet-to-PostNet', price: 109.00, isEnabled: false),

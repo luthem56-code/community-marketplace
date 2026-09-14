@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/main_navigation_shell.dart';
 
 // Import our screens
 import 'screens/marketplace_feed_screen.dart';
@@ -40,7 +41,7 @@ class CommunityMarketplaceApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Point home to the Marketplace Feed
-      home: const MarketplaceFeedScreen(),
+      home: const MainNavigationShell(),
     );
   }
 }

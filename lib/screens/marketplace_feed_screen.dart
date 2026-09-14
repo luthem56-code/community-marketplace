@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/listing_model.dart';
-import 'create_listing_screen.dart';
 import 'listing_detail_screen.dart';
-import 'orders_screen.dart';
-import 'wallet_screen.dart';
 
 class MarketplaceFeedScreen extends StatefulWidget {
   const MarketplaceFeedScreen({super.key});
@@ -15,6 +13,8 @@ class MarketplaceFeedScreen extends StatefulWidget {
 
 class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
   String _selectedCategory = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
   final List<String> _categories = [
     'All',
@@ -27,8 +27,13 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
   ];
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Query Firestore listings
     Query query = FirebaseFirestore.instance.collection('listings');
 
     if (_selectedCategory != 'All') {
@@ -38,250 +43,85 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        title: const Text(
-          'COMMUNITY MARKETPLACE',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.1,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.black87),
-            tooltip: 'My Wallet',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WalletScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined, color: Colors.black87),
-            tooltip: 'My Orders',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const OrdersScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {
-              // Search feature coming next
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // --- Category Pills (Horizontal Scroll) ---
-          Container(
-            color: Colors.white,
-            height: 52,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = _selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF008080),
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    backgroundColor: Colors.grey.shade200,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() => _selectedCategory = category);
-                      }
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          const Divider(height: 1, thickness: 1),
-
-          // --- Realtime Product Feed ---
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: query.snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        'Error loading listings: ${snapshot.error}',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final docs = snapshot.data?.docs ?? [];
-
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.storefront_outlined, size: 70, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No items listed yet!',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Be the first to list an item in your community.',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text('Sell an Item'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF008080),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CreateListingScreen()),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // 2-Column Product Grid (Yaga-style)
-                return GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.65,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final listing = ListingModel.fromFirestore(docs[index]);
-                    return _ProductCard(listing: listing);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-
-      // --- Floating "Sell" Action Button ---
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF008080),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.camera_alt),
-        label: const Text('Sell', style: TextStyle(fontWeight: FontWeight.bold)),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateListingScreen()),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// Yaga-style Product Card Component
-class _ProductCard extends StatelessWidget {
-  final ListingModel listing;
-  const _ProductCard({required this.listing});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ListingDetailScreen(listing: listing),
-          ),
-        );
-      },
-      child: Container(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
+      backgroundColor: const Color(0xFFF9F9F9),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image with Condition Badge
-            Expanded(
-              child: Stack(
+            // --- 1. Top Header with Community Branding & Search ---
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Positioned.fill(
-                    child: listing.imageUrls.isNotEmpty
-                        ? Image.network(
-                            listing.imageUrls.first,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey.shade200,
-                              child: const Icon(Icons.image_not_supported),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'COMMUNITY MARKET',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              color: Color(0xFF008080),
                             ),
-                          )
-                        : Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.image),
                           ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(4),
+                          Text(
+                            'Verified neighbor-to-neighbor closet & goods',
+                            style: TextStyle(fontSize: 11, color: Colors.black54),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        listing.size.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F2F2),
+                          borderRadius: BorderRadius.circular(20),
                         ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.shield, size: 14, color: Color(0xFF008080)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Escrow Protected',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF008080)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Modern Search Input
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, color: Colors.black54, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        hintText: 'Search Zara, dresses, shoes, jackets...',
+                        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                     ),
                   ),
@@ -289,14 +129,220 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
 
-            // Item Details
+            // --- 2. Category Filter Pills ---
+            Container(
+              color: Colors.white,
+              height: 48,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  final isSelected = _selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFF008080),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                      backgroundColor: Colors.grey.shade100,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      side: BorderSide(
+                        color: isSelected ? const Color(0xFF008080) : Colors.grey.shade300,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _selectedCategory = category);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1, thickness: 1),
+
+            // --- 3. Product Feed ---
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: query.snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error loading feed: ${snapshot.error}'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF008080)));
+                  }
+
+                  var docs = snapshot.data?.docs ?? [];
+
+                  // Client-side search filtering (by title, brand, or size)
+                  if (_searchQuery.isNotEmpty) {
+                    docs = docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final title = (data['title'] ?? '').toString().toLowerCase();
+                      final brand = (data['brand'] ?? '').toString().toLowerCase();
+                      final desc = (data['description'] ?? '').toString().toLowerCase();
+                      return title.contains(_searchQuery) || brand.contains(_searchQuery) || desc.contains(_searchQuery);
+                    }).toList();
+                  }
+
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 60, color: Colors.grey.shade400),
+                          const SizedBox(height: 12),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No items found for "$_searchQuery"'
+                                : 'No listings in $_selectedCategory yet.',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('Try a different search term or category.', style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.64,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final listing = ListingModel.fromFirestore(docs[index]);
+                      return _ProductCard(listing: listing);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Upgraded Product Card with Heart Wishlist & Community Badge
+class _ProductCard extends StatefulWidget {
+  final ListingModel listing;
+  const _ProductCard({required this.listing});
+
+  @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  bool _isFavorite = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.listing;
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: item)),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Stack (with size tag & favorite heart)
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: item.imageUrls.isNotEmpty
+                        ? Image.network(
+                            item.imageUrls.first,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade200,
+                              child: const Icon(Icons.image_not_supported),
+                            ),
+                          )
+                        : Container(color: Colors.grey.shade200, child: const Icon(Icons.image)),
+                  ),
+                  // Size badge
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.size.toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  // Favorite Heart Button
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: IconButton(
+                        icon: Icon(
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: _isFavorite ? Colors.red : Colors.white,
+                          size: 22,
+                        ),
+                        onPressed: () {
+                          setState(() => _isFavorite = !_isFavorite);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              duration: const Duration(seconds: 1),
+                              content: Text(_isFavorite ? 'Saved to Favorites ❤️' : 'Removed from Favorites'),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Details
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(10.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'R ${listing.price.toStringAsFixed(0)}',
+                    'R ${item.price.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
@@ -305,24 +351,35 @@ class _ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    listing.title,
+                    item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    listing.brand,
+                    item.brand,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 6),
+                  // Verified Community Member Tag
+                  Row(
+                    children: [
+                      const Icon(Icons.verified, size: 12, color: Color(0xFF008080)),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Verified Neighbor',
+                        style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
       ),
     );
   }
