@@ -1,3 +1,4 @@
+import 'package:community_marketplace/services/whatsapp_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -374,6 +375,14 @@ class _WalletScreenState extends State<WalletScreen> {
                       final walletRef = firestore.collection('wallets').doc(userId);
                       batch.update(walletRef, {'availableBalance': FieldValue.increment(-withdrawAmount)});
                       await batch.commit();
+                      // Notify Admin of pending EFT payout
+      await WhatsAppHelper.sendNotification(
+        recipientUserId: 'admin', // Or your admin user UID
+        title: 'New EFT Payout Request 💳',
+        message: 'R${withdrawAmount.toStringAsFixed(2)} cashout requested to $selectedBank.',
+        type: 'wallet',
+        targetId: payoutId,
+      );
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

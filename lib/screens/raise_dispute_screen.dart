@@ -1,3 +1,4 @@
+import 'package:community_marketplace/services/whatsapp_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
@@ -61,6 +62,14 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
       batch.update(orderRef, {'status': 'disputed'});
 
       await batch.commit();
+      // Notify Admin of new dispute
+      await WhatsAppHelper.sendNotification(
+        recipientUserId: 'admin', // Or your admin user UID
+        title: 'URGENT: New Dispute Opened ⚠️',
+        message: 'Dispute logged on "${widget.itemTitle}" (R${widget.totalAmount.toStringAsFixed(0)}). Escrow is frozen.',
+        type: 'dispute',
+        targetId: widget.orderId,
+      );
 
       if (!mounted) return;
 

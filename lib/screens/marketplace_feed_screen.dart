@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:community_marketplace/screens/admin_dashboard_screen.dart';
 import 'package:community_marketplace/screens/auth_screen.dart';
+import 'package:community_marketplace/services/admin_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -444,11 +446,67 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                 },
               ),
             ),
+            // Inside Drawer list items in marketplace_feed_screen.dart:
+          // --- ADMIN-ONLY ENTRY (COMPLETELY INVISIBLE TO REGULAR USERS & GUESTS) ---
+          if (isLoggedIn)
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+              builder: (context, userSnap) {
+                bool isAdmin = false;
+
+                // Check admin email list
+                if (user?.email != null && AdminService.adminEmails.contains(user!.email!.trim().toLowerCase())) {
+                  isAdmin = true;
+                }
+
+                // Check role in Firestore
+                if (userSnap.hasData && userSnap.data!.exists) {
+                  final data = userSnap.data!.data() as Map<String, dynamic>?;
+                  if (data?['role'] == 'admin') {
+                    isAdmin = true;
+                  }
+                }
+
+                // If NOT admin, return completely empty (hidden!)
+                if (!isAdmin) return const SizedBox.shrink();
+
+                // ONLY ADMIN SEES THIS:
+                return Column(
+                  children: [
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.admin_panel_settings, color: Colors.amber),
+                      title: const Text(
+                        'Admin Command Center',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      ),
+                      subtitle: const Text('Authorized Admin Only', style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          const Divider(),
 
           ListTile(
             leading: const Icon(Icons.storefront, color: Color(0xFF008080)),
             title: const Text('Browse Market'),
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF008080)),
+            title: const Text('Wallet & Payouts (EFT)'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
+            },
           ),
           ListTile(
             leading: const Icon(Icons.add_circle_outline, color: Color(0xFF008080)),
@@ -473,14 +531,6 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             onTap: () {
               Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF008080)),
-            title: const Text('Wallet & Payouts (EFT)'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
             },
           ),
           const Divider(),
