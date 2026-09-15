@@ -1,3 +1,5 @@
+import 'package:community_marketplace/services/whatsapp_helper.dart';
+import 'package:community_marketplace/widgets/drop_point_map_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -100,6 +102,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       batch.update(listingRef, {'status': 'sold'});
 
       await batch.commit();
+      // Send in-app notification to the seller
+      await WhatsAppHelper.sendNotification(
+        recipientUserId: widget.listing.sellerId,
+        title: 'Item Sold! 📦',
+        message: 'Your item "${widget.listing.title}" was purchased for R${widget.listing.price.toStringAsFixed(0)}. Payout held in escrow.',
+        type: 'order',
+        targetId: orderId,
+      );
 
       if (!mounted) return;
 
@@ -311,6 +321,98 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         return null;
                       },
                     ),
+                    // --- 3. Delivery & Recipient Details ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Delivery & Recipient Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        // --- FIND ON MAP BUTTON ---
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF008080),
+                            backgroundColor: const Color(0xFFE6F2F2),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          icon: const Icon(Icons.pin_drop, size: 16),
+                          label: const Text('Find on Map', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            final selectedAddress = await showModalBottomSheet<String>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => DropPointMapPicker(
+                                initialCourierType: _selectedShipping.method,
+                              ),
+                            );
+
+                            if (selectedAddress != null && selectedAddress.isNotEmpty) {
+                              setState(() {
+                                _addressController.text = selectedAddress;
+                              });
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: const Color(0xFF008080),
+                                    content: Text('📍 Pinned & Auto-filled: $selectedAddress'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Recipient Full Name *',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (val) => val == null || val.isEmpty ? 'Name required' : null,
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'SA Cellphone Number (for Courier SMS / OTP) *',
+                        hintText: 'e.g. 082 123 4567',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Phone number required for courier pin';
+                        if (val.replaceAll(' ', '').length < 10) return 'Enter a valid 10-digit number';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Address / Drop-point input with Auto-fill indicator
+                    TextFormField(
+                      controller: _addressController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: _selectedShipping.method.contains('Pudo')
+                            ? 'Pudo Locker Location / Address *'
+                            : _selectedShipping.method.contains('PAXI')
+                                ? 'PEP Store Branch Name / Code *'
+                                : 'Delivery Address *',
+                        hintText: 'Tap "Find on Map" above or type manually...',
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (val) => val == null || val.isEmpty ? 'Delivery location details required' : null,
+                    ),
+                    const SizedBox(height: 24),
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: _addressController,

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import '../models/listing_model.dart';
-import 'chat_screen.dart';
-import 'checkout_screen.dart';
 import 'package:flutter/services.dart';
-import 'seller_shop_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'how_it_works_screen.dart';
 import 'package:uuid/uuid.dart';
+
+import '../models/listing_model.dart';
 import '../models/offer_model.dart';
+import 'checkout_screen.dart';
+import 'auth_screen.dart';
+import 'chat_screen.dart';
+import 'seller_shop_screen.dart';
+import 'how_it_works_screen.dart';
+import '../services/whatsapp_helper.dart';
 
 class ListingDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -21,501 +24,437 @@ class ListingDetailScreen extends StatefulWidget {
 
 class _ListingDetailScreenState extends State<ListingDetailScreen> {
   int _currentImageIndex = 0;
-  void _showShareSheet(BuildContext context, ListingModel item) {
-    final shareText = 'Check out this "${item.title}" on PMB Community Market for only R${item.price.toStringAsFixed(0)}! 👗👕\n\n100% Escrow Protected with Local PMB Collection & Pudo delivery.';
-void _showShareSheet(BuildContext context, ListingModel item) {
-    final shareText = 'Check out this "${item.title}" on PMB Community Market for only R${item.price.toStringAsFixed(0)}! 👗👕\n\n100% Escrow Protected with Local PMB Collection & Pudo delivery.';
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Share this Listing',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            // 1. Copy Link Option
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFFE6F2F2),
-                child: Icon(Icons.link, color: Color(0xFF008080)),
-              ),
-              title: const Text('Copy Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Copy listing details to clipboard'),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: shareText));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: Color(0xFF008080),
-                    content: Text('Listing link copied to clipboard! 📋'),
-                  ),
-                );
-              },
-            ),
-
-            // 2. Share via WhatsApp Option
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFFE8F5E9),
-                child: Icon(Icons.chat, color: Colors.green),
-              ),
-              title: const Text('Share on WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Send to PMB community & church groups'),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: shareText));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: Colors.green,
-                    content: Text('Text copied! Paste it directly into your WhatsApp chat.'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Share this Listing',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            // 1. Copy Link Option
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFFE6F2F2),
-                child: Icon(Icons.link, color: Color(0xFF008080)),
-              ),
-              title: const Text('Copy Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Copy listing details to clipboard'),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: shareText));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: Color(0xFF008080),
-                    content: Text('Listing link copied to clipboard! 📋'),
-                  ),
-                );
-              },
-            ),
-            
-
-            // 2. Share via WhatsApp Option
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFFE8F5E9),
-                child: Icon(Icons.chat, color: Colors.green),
-              ),
-              title: const Text('Share on WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              subtitle: const Text('Send to PMB community & church groups'),
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: shareText));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: Colors.green,
-                    content: Text('Text copied! Paste it directly into your WhatsApp chat.'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final item = widget.listing;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.black),
-            tooltip: 'Share Item',
-            onPressed: () => _showShareSheet(context, item),
+    // Realtime listener to check if THIS logged-in user has an ACCEPTED offer on this item
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('offers')
+          .where('listingId', isEqualTo: item.id)
+          .where('buyerId', isEqualTo: currentUserId)
+          .where('status', isEqualTo: 'accepted')
+          .snapshots(),
+      builder: (context, offerSnapshot) {
+        // If an accepted offer exists, use that lower price!
+        double effectivePrice = item.price;
+        bool hasAcceptedOffer = false;
+
+        if (offerSnapshot.hasData && offerSnapshot.data!.docs.isNotEmpty) {
+          final offerData = offerSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+          effectivePrice = (offerData['offeredPrice'] as num?)?.toDouble() ?? item.price;
+          hasAcceptedOffer = true;
+        }
+
+        // Create the active listing instance with the effective price
+        final activeListing = ListingModel(
+          id: item.id,
+          sellerId: item.sellerId,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          subCategory: item.subCategory,
+          size: item.size,
+          brand: item.brand,
+          condition: item.condition,
+          price: effectivePrice, // Automatically carries discounted price to checkout!
+          imageUrls: item.imageUrls,
+          shippingOptions: item.shippingOptions,
+          createdAt: item.createdAt,
+        );
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.black),
+                tooltip: 'Share Item',
+                onPressed: () => _showShareSheet(context, item),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.black),
-            onPressed: () {
-              // Add to wishlist/likes
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- 1. Image Slider ---
-            Stack(
+          body: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  height: 380,
-                  width: double.infinity,
-                  child: item.imageUrls.isNotEmpty
-                      ? PageView.builder(
-                          itemCount: item.imageUrls.length,
-                          onPageChanged: (index) {
-                            setState(() => _currentImageIndex = index);
-                          },
-                          itemBuilder: (context, index) {
-                            return Image.network(
-                              item.imageUrls[index],
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey.shade200,
-                                child: const Icon(Icons.broken_image, size: 60),
+                // 1. Photo Carousel
+                Stack(
+                  children: [
+                    SizedBox(
+                      height: 380,
+                      width: double.infinity,
+                      child: item.imageUrls.isNotEmpty
+                          ? PageView.builder(
+                              itemCount: item.imageUrls.length,
+                              onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                              itemBuilder: (context, index) {
+                                return Image.network(
+                                  item.imageUrls[index],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(Icons.broken_image, size: 60),
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(color: Colors.grey.shade200, child: const Icon(Icons.image, size: 60)),
+                    ),
+                    if (item.imageUrls.length > 1)
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            item.imageUrls.length,
+                            (index) => Container(
+                              width: 8,
+                              height: 8,
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: _currentImageIndex == index ? const Color(0xFF008080) : Colors.white.withOpacity(0.7),
                               ),
-                            );
-                          },
-                        )
-                      : Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.image, size: 60),
-                        ),
-                ),
-                // Indicator dots
-                if (item.imageUrls.length > 1)
-                  Positioned(
-                    bottom: 12,
-                    left: 0,
-                    right: 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        item.imageUrls.length,
-                        (index) => Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _currentImageIndex == index
-                                ? const Color(0xFF008080)
-                                : Colors.white.withOpacity(0.7),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
+                  ],
+                ),
 
-            // --- 2. Title & Price Section ---
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'R ${item.price.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF008080),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Item specs tags (Size, Brand, Condition)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                // 2. Title & Dynamic Price Section
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _specBadge(Icons.straighten, 'Size: ${item.size}'),
-                      _specBadge(Icons.sell_outlined, 'Brand: ${item.brand}'),
-                      _specBadge(Icons.verified_outlined, item.condition.label),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(),
+                      // Accepted Offer Alert Banner
+                      if (hasAcceptedOffer)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.local_offer, color: Colors.green.shade800, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Special Offer Accepted! You save R${(item.price - effectivePrice).toStringAsFixed(0)}',
+                                  style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
-                  // --- 3. Description ---
-                  const Text(
-                    'Description',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade800,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-
-                  // --- 4. Delivery Methods ---
-                  const Text(
-                    'Available Delivery Options',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  ...item.shippingOptions.map(
-                    (opt) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Row(
+                      // Price Display
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
-                          const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFF008080)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(opt.method, style: const TextStyle(fontSize: 14)),
-                          ),
                           Text(
-                            'R ${opt.price.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            'R ${effectivePrice.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF008080),
+                            ),
                           ),
+                          if (hasAcceptedOffer) ...[
+                            const SizedBox(width: 10),
+                            Text(
+                              'R ${item.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade500,
+                                decoration: TextDecoration.lineThrough,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Text(item.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 14),
+
+                      // Item Spec Badges
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _specBadge(Icons.straighten, 'Size: ${item.size}'),
+                          _specBadge(Icons.sell_outlined, 'Brand: ${item.brand}'),
+                          _specBadge(Icons.verified_outlined, item.condition.label),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Divider(),
+
+                      // 3. Description
+                      const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(item.description, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4)),
+                      const SizedBox(height: 20),
+                      const Divider(),
+
+                      // 4. Delivery Methods
+                      const Text('Available Delivery Options', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      ...item.shippingOptions.map(
+                        (opt) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFF008080)),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(opt.method, style: const TextStyle(fontSize: 14))),
+                              Text(
+                                opt.price == 0 ? 'FREE' : 'R ${opt.price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: opt.price == 0 ? Colors.green.shade800 : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 5. Seller Closet Card
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SellerShopScreen(sellerId: item.sellerId, shopName: 'Neighbor Closet'),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: const Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Color(0xFF008080),
+                                child: Icon(Icons.person, color: Colors.white, size: 24),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Neighbor Closet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    SizedBox(height: 2),
+                                    Text('Verified Resident • 5.0 ⭐ (14 sales)', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, color: Colors.black45),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 6. Buyer Protection Box
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const HowItWorksScreen()));
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F2F2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Community Buyer Protection', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Money is held securely in escrow. Funds are released only after you receive and confirm your item. Tap to learn how it works.',
+                                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, size: 18, color: Color(0xFF008080)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  // --- Seller Profile Card (Yaga-style) ---
-                  InkWell(
-                    onTap: () {
+                ),
+              ],
+            ),
+          ),
+
+          // 7. Sticky Bottom Action Bar
+          bottomNavigationBar: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -3)),
+              ],
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  // In-App Chat
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF008080)),
+                    tooltip: 'In-App Chat',
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => SellerShopScreen(
-                            sellerId: item.sellerId,
-                            shopName: 'Neighbor Closet',
+                          builder: (_) => ChatScreen(
+                            listing: item,
+                            otherUserId: item.sellerId,
+                            otherUserName: 'Seller Closet',
                           ),
                         ),
                       );
                     },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 22,
-                            backgroundColor: Color(0xFF008080),
-                            child: Icon(Icons.person, color: Colors.white, size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Neighbor Closet',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Icon(Icons.verified, size: 12, color: Color(0xFF008080)),
-                                    SizedBox(width: 3),
-                                    Text(
-                                      'Verified Resident • 5.0 ⭐ (14 sales)',
-                                      style: TextStyle(fontSize: 11, color: Colors.black54),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, color: Colors.black45),
-                        ],
-                      ),
-                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(width: 6),
 
-                  
-                  // --- 5. Buyer Protection Box ---
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HowItWorksScreen()),
+                  // WhatsApp Ping
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8F5E9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    icon: const Icon(Icons.chat, color: Colors.green),
+                    tooltip: 'Chat on WhatsApp',
+                    onPressed: () {
+                      WhatsAppHelper.openChat(
+                        context: context,
+                        rawPhone: '0821234567',
+                        itemTitle: item.title,
+                        itemPrice: effectivePrice,
                       );
                     },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6F2F2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Make Offer button (or Show "Offer Accepted" badge)
+                  if (!hasAcceptedOffer)
+                    // Make Offer button with Auth check
+                  if (!hasAcceptedOffer)
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFF008080), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () async {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null || user.isAnonymous) {
+                            final loggedIn = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AuthScreen()),
+                            );
+                            if (loggedIn != true || !mounted) return;
+                          }
+                          _showMakeOfferDialog(context, item);
+                        },
+                        child: const Text('Make Offer', style: TextStyle(color: Color(0xFF008080), fontWeight: FontWeight.bold)),
                       ),
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Community Buyer Protection',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF008080),
-                                      ),
-                                    ),
-                                    Spacer(),
-                                    Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF008080)),
-                                  ],
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Money is held securely in escrow. Funds are only released after you receive and confirm your item. Tap to learn how it works.',
-                                  style: TextStyle(fontSize: 12, color: Colors.black87),
-                                ),
-                              ],
-                            ),
+                    ),
+                  if (hasAcceptedOffer) const SizedBox(width: 4),
+
+                  // Buy Now button (Passes the discounted price straight to Checkout!)
+                  // Buy Now button with Automatic Auth Intercept & Resume
+                  Expanded(
+                    flex: hasAcceptedOffer ? 5 : 3,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: hasAcceptedOffer ? Colors.green.shade700 : const Color(0xFF008080),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () async {
+                        final user = FirebaseAuth.instance.currentUser;
+                        // 1. If not logged in (or guest), send to Auth Screen:
+                        if (user == null || user.isAnonymous) {
+                          final loggedIn = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AuthScreen()),
+                          );
+                          // If they didn't finish logging in, stop here
+                          if (loggedIn != true || !mounted) return;
+                        }
+
+                        // 2. Once logged in, the item is still waiting -> Go straight to Checkout!
+                        if (!mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CheckoutScreen(listing: activeListing),
                           ),
-                        ],
+                        );
+                      },
+                      child: Text(
+                        hasAcceptedOffer ? 'Buy at Offer: R${effectivePrice.toStringAsFixed(0)}' : 'Buy Now',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-
-      // --- 6. Bottom Sticky Action Bar ---
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Row(
-            children: [
-              // 1. Message Seller Button (NEW)
-              IconButton(
-                style: IconButton.styleFrom(
-                  side: BorderSide(color: Colors.grey.shade300),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.all(12),
-                ),
-                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF008080)),
-                tooltip: 'Message Seller',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        listing: item,
-                        otherUserId: item.sellerId,
-                        otherUserName: 'Seller Closet',
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: OutlinedButton(
-                  onPressed: () {
-                    _showMakeOfferDialog(context, item);
-                  },
-                  child: const Text(
-                    'Make Offer',
-                    style: TextStyle(
-                      color: Color(0xFF008080),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // "Buy Now" button
-              Expanded(
-                flex: 3,
-                // Find the "Buy Now" button inside listing_detail_screen.dart:
-child: ElevatedButton(
-  style: ElevatedButton.styleFrom(
-    backgroundColor: const Color(0xFF008080),
-    foregroundColor: Colors.white,
-    padding: const EdgeInsets.symmetric(vertical: 14),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-  ),
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CheckoutScreen(listing: item),
-      ),
-    );
-  },
-  child: const Text(
-    'Buy Now',
-    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-  ),
-),
-              ),
-            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -532,10 +471,7 @@ child: ElevatedButton(
         children: [
           Icon(icon, size: 14, color: Colors.grey.shade700),
           const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
-          ),
+          Text(text, style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -546,83 +482,51 @@ child: ElevatedButton(
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to make an offer.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in first.')));
       return;
     }
 
     if (currentUser.uid == item.sellerId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You cannot make an offer on your own listing!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot make an offer on your own listing!')));
       return;
     }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, left: 20, right: 20, top: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Make an Offer',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text('Make an Offer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text(
-              'Listed price: R ${item.price.toStringAsFixed(0)}. Realistic offers (within 20-30%) are most likely to be accepted.',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-            ),
+            Text('Listed price: R ${item.price.toStringAsFixed(0)}. Reasonable offers are more likely to be accepted.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             const SizedBox(height: 16),
             TextField(
               controller: offerController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
-              decoration: const InputDecoration(
-                prefixText: 'R ',
-                labelText: 'Your Offer (ZAR) *',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(prefixText: 'R ', labelText: 'Your Offer (ZAR) *', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF008080),
-                  foregroundColor: Colors.white,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
                 onPressed: () async {
                   final offeredAmount = double.tryParse(offerController.text.trim()) ?? 0.0;
-
-                  // Minimum offer threshold: at least 40% of listed price
-                  if (offeredAmount < (item.price * 0.4) || offeredAmount >= item.price) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Offer must be between R${(item.price * 0.4).toStringAsFixed(0)} and R${(item.price - 1).toStringAsFixed(0)}',
-                        ),
-                      ),
-                    );
+                  if (offeredAmount <= 0 || offeredAmount >= item.price) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Offer must be lower than R${item.price.toStringAsFixed(0)}')));
                     return;
                   }
 
                   Navigator.pop(ctx);
-
                   final offerId = const Uuid().v4();
+
                   final newOffer = OfferModel(
                     offerId: offerId,
                     listingId: item.id,
@@ -636,22 +540,64 @@ child: ElevatedButton(
                     createdAt: DateTime.now(),
                   );
 
-                  await FirebaseFirestore.instance
-                      .collection('offers')
-                      .doc(offerId)
-                      .set(newOffer.toMap());
+                  await FirebaseFirestore.instance.collection('offers').doc(offerId).set(newOffer.toMap());
+
+                  // Send in-app notification to seller
+                  await WhatsAppHelper.sendNotification(
+                    recipientUserId: item.sellerId,
+                    title: 'New Offer Received! 🏷️',
+                    message: 'Someone made an offer of R${offeredAmount.toStringAsFixed(0)} on "${item.title}". Tap to review.',
+                    type: 'offer',
+                    targetId: offerId,
+                  );
 
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: const Color(0xFF008080),
-                        content: Text('Offer of R${offeredAmount.toStringAsFixed(2)} submitted to seller! 🎉'),
-                      ),
+                      SnackBar(backgroundColor: const Color(0xFF008080), content: Text('Offer of R${offeredAmount.toStringAsFixed(2)} sent to seller! 🎉')),
                     );
                   }
                 },
                 child: const Text('Send Offer', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showShareSheet(BuildContext context, ListingModel item) {
+    final shareText = 'Check out "${item.title}" on PMB Community Market for only R${item.price.toStringAsFixed(0)}! 👗👕\n\n100% Escrow Protected with Local PMB Collection & Pudo delivery.';
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Share this Listing', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFE6F2F2), child: Icon(Icons.link, color: Color(0xFF008080))),
+              title: const Text('Copy Link', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Copy listing details to clipboard'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Color(0xFF008080), content: Text('Link copied! 📋')));
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.chat, color: Colors.green)),
+              title: const Text('Share on WhatsApp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              subtitle: const Text('Send to community & church groups'),
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: shareText));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text('Text copied! Paste it in your WhatsApp chat.')));
+              },
             ),
           ],
         ),

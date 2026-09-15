@@ -21,10 +21,12 @@ class OrdersScreen extends StatelessWidget {
           title: const Text('Orders & Offers', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
           backgroundColor: Colors.white,
           elevation: 0.5,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () => Navigator.pop(context),
-          ),
+          leading: Navigator.canPop(context)
+    ? IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black),
+        onPressed: () => Navigator.pop(context),
+      )
+    : null,
           bottom: const TabBar(
             labelColor: Color(0xFF008080),
             unselectedLabelColor: Colors.black54,

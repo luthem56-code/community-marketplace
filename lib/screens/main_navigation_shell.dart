@@ -3,6 +3,7 @@ import 'marketplace_feed_screen.dart';
 import 'create_listing_screen.dart';
 import 'user_profile_screen.dart';
 import 'orders_screen.dart';
+import 'explore_screen.dart';
 import 'wallet_screen.dart';
 
 class MainNavigationShell extends StatefulWidget {
@@ -17,7 +18,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   final List<Widget> _pages = [
     const MarketplaceFeedScreen(),
-    const _CommunityPlaceholderScreen(), // Clean placeholder parked for later
+    const ExploreScreen(),         // Tab 1: Explore & Category Directory!
     const SizedBox(), // Intercepted for Sell (+)
     const OrdersScreen(),
     const WalletScreen(),
@@ -68,9 +69,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               label: 'Market',
             ),
             const BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'Community',
+              icon: Icon(Icons.explore_outlined),
+              activeIcon: Icon(Icons.explore),
+              label: 'Explore',
             ),
             BottomNavigationBarItem(
               icon: Container(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'how_it_works_screen.dart';
+import 'main_navigation_shell.dart';
 
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
@@ -219,9 +220,19 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+  icon: const Icon(Icons.arrow_back, color: Colors.black),
+  tooltip: 'Back',
+  onPressed: () {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+      );
+    }
+  },
+),
       ),
       body: SingleChildScrollView(
         child: Column(

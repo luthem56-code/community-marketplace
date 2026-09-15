@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'package:community_marketplace/screens/auth_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/listing_model.dart';
 import 'listing_detail_screen.dart';
-import 'how_it_works_screen.dart';
-import 'help_center_screen.dart';
 import 'orders_screen.dart';
 import 'wallet_screen.dart';
 import 'create_listing_screen.dart';
 import 'user_profile_screen.dart';
+import 'help_center_screen.dart';
+import 'how_it_works_screen.dart';
+import 'notifications_screen.dart';
 
 class MarketplaceFeedScreen extends StatefulWidget {
   const MarketplaceFeedScreen({super.key});
@@ -23,35 +25,6 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
   String _selectedBrand = '';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-
-  // Hero Carousel State
-  final PageController _pageController = PageController();
-  int _currentBannerIndex = 0;
-  Timer? _carouselTimer;
-
-  final List<Map<String, dynamic>> _heroBanners = [
-    {
-      'title': 'Sell Clothes for FREE',
-      'subtitle': '0% seller commission. Turn your wardrobe into cash in 60s.',
-      'tag': '0% COMMISSION',
-      'colors': [Color(0xFF008080), Color(0xFF004D40)],
-      'icon': Icons.sell_outlined,
-    },
-    {
-      'title': '100% Escrow Protection',
-      'subtitle': 'Shop with trust. Funds are released only after parcel delivery.',
-      'tag': 'SAFE SHOPPING',
-      'colors': [Color(0xFF1E3C72), Color(0xFF2A5298)],
-      'icon': Icons.shield_outlined,
-    },
-    {
-      'title': 'Free Local PMB Meetup',
-      'subtitle': 'Collect from neighbors in Pietermaritzburg & save R60 on couriers.',
-      'tag': 'PMB COMMUNITY',
-      'colors': [Color(0xFF512DA8), Color(0xFF673AB7)],
-      'icon': Icons.place_outlined,
-    },
-  ];
 
   final List<String> _popularBrands = [
     'All Brands',
@@ -79,25 +52,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    // Auto-advance banner every 4.5 seconds
-    _carouselTimer = Timer.periodic(const Duration(milliseconds: 4500), (timer) {
-      if (_pageController.hasClients) {
-        final nextPage = (_currentBannerIndex + 1) % _heroBanners.length;
-        _pageController.animateToPage(
-          nextPage,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-
-  @override
   void dispose() {
-    _carouselTimer?.cancel();
-    _pageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -114,9 +69,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      // --- ITEM 3: YAGA-STYLE SIDE BAR NAVIGATION DRAWER ---
       drawer: _buildMarketplaceDrawer(context),
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
@@ -137,6 +90,48 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
           ),
         ),
         actions: [
+          // --- LIVE NOTIFICATION BELL WITH BADGE ---
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('notifications')
+                .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
+                .where('isRead', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snap) {
+              final unreadCount = snap.data?.docs.length ?? 0;
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
+                    tooltip: 'Notifications',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.black87),
             tooltip: 'My Wallet',
@@ -192,111 +187,9 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             ),
           ),
 
-          // 2. High-Impact Hero Promotional Carousel
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: 140,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: _heroBanners.length,
-                      onPageChanged: (i) => setState(() => _currentBannerIndex = i),
-                      itemBuilder: (context, index) {
-                        final b = _heroBanners[index];
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: b['colors'] as List<Color>,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (b['colors'][0] as Color).withOpacity(0.25),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        b['tag'],
-                                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      b['title'],
-                                      style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      b['subtitle'],
-                                      maxLines: 2,
-                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(b['icon'] as IconData, size: 54, color: Colors.white.withOpacity(0.85)),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Inside Drawer list items in marketplace_feed_screen.dart:
-          ListTile(
-            leading: const Icon(Icons.help_center_outlined, color: Color(0xFF008080)),
-            title: const Text('Help Center & Guides'),
-            subtitle: const Text('Buying, selling, safety & terms', style: TextStyle(fontSize: 11)),
-            onTap: () {
-              Navigator.pop(context); // Close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
-              );
-            },
-          ),
-
-                  // Carousel Indicator Dots
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _heroBanners.length,
-                      (i) => Container(
-                        width: _currentBannerIndex == i ? 18 : 6,
-                        height: 5,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: _currentBannerIndex == i ? const Color(0xFF008080) : Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // 2. Isolated Hero Promotional Carousel (Will NEVER flip or rebuild the feed below!)
+          const SliverToBoxAdapter(
+            child: _HeroBannerCarousel(),
           ),
 
           // 3. Circular Category Tiles
@@ -432,7 +325,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
 
               var docs = snapshot.data?.docs ?? [];
 
-              // Filter by brand if selected
+              // Filter by brand
               if (_selectedBrand.isNotEmpty) {
                 docs = docs.where((d) {
                   final brand = (d.data() as Map<String, dynamic>)['brand']?.toString().toLowerCase() ?? '';
@@ -492,17 +385,19 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
     );
   }
 
-  // --- ITEM 3: YAGA-STYLE SIDE BAR MENU ---
+  // --- YAGA-STYLE SIDE BAR MENU ---
   Widget _buildMarketplaceDrawer(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = user != null && !user.isAnonymous;
     final uid = user?.uid ?? '';
-    final name = user?.displayName ?? 'Community Member';
+    final name = user?.displayName ?? (isLoggedIn ? 'Community Member' : 'Guest Visitor');
+    final email = user?.email ?? 'Sign in to start selling & buying';
 
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // Drawer User Header with Wallet Balance
+          // User Header
           UserAccountsDrawerHeader(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -514,24 +409,43 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
               child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : 'M',
+                name.isNotEmpty ? name[0].toUpperCase() : 'G',
                 style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF008080)),
               ),
             ),
             accountName: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            accountEmail: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('wallets').doc(uid).snapshots(),
-              builder: (context, snap) {
-                double balance = 0.0;
-                if (snap.hasData && snap.data!.exists) {
-                  balance = ((snap.data!.data() as Map<String, dynamic>)['availableBalance'] as num?)?.toDouble() ?? 0.0;
-                }
-                return Text('Wallet: R ${balance.toStringAsFixed(2)} available', style: const TextStyle(color: Colors.white70));
-              },
-            ),
+            accountEmail: isLoggedIn
+                ? StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection('wallets').doc(uid).snapshots(),
+                    builder: (context, snap) {
+                      double balance = 0.0;
+                      if (snap.hasData && snap.data!.exists) {
+                        balance = ((snap.data!.data() as Map<String, dynamic>)['availableBalance'] as num?)?.toDouble() ?? 0.0;
+                      }
+                      return Text('Wallet: R ${balance.toStringAsFixed(2)} available', style: const TextStyle(color: Colors.white70));
+                    },
+                  )
+                : Text(email, style: const TextStyle(color: Colors.white70)),
           ),
 
-          // Drawer Navigation Items
+          // If Guest: Prominent Sign In Prompt
+          if (!isLoggedIn)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF008080),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign In / Register', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+                },
+              ),
+            ),
+
           ListTile(
             leading: const Icon(Icons.storefront, color: Color(0xFF008080)),
             title: const Text('Browse Market'),
@@ -542,16 +456,17 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             title: const Text('Sell an Item (0% Commission)'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
+              if (!isLoggedIn) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateListingScreen()));
+              }
             },
           ),
           ListTile(
             leading: const Icon(Icons.person_outline, color: Color(0xFF008080)),
             title: const Text('My Closet & Listings'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const UserProfileScreen()));
-            },
+            onTap: () => Navigator.pop(context),
           ),
           ListTile(
             leading: const Icon(Icons.local_mall_outlined, color: Color(0xFF008080)),
@@ -570,36 +485,193 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             },
           ),
           const Divider(),
-
-          // Categories Sub-header
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('CATEGORIES', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-          ..._categoryChips.map((c) => ListTile(
-                dense: true,
-                leading: Icon(c['icon'] as IconData, size: 20, color: Colors.grey.shade700),
-                title: Text(c['name'], style: const TextStyle(fontSize: 14)),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => _selectedCategory = c['name']);
-                },
-              )),
-          const Divider(),
-
-          // Safety & Help
-          // Replace the dialog popup with a direct full-screen page navigation:
           ListTile(
-            leading: const Icon(Icons.help_outline, color: Color(0xFF008080)),
-            title: const Text('How Marketplace Works'),
-            subtitle: const Text('Escrow protection & seller guide', style: TextStyle(fontSize: 11)),
+            leading: const Icon(Icons.help_center_outlined, color: Color(0xFF008080)),
+            title: const Text('Help Center & Guides'),
+            subtitle: const Text('Buying, selling, safety & terms', style: TextStyle(fontSize: 11)),
             onTap: () {
-              Navigator.pop(context); // close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const HowItWorksScreen()),
-              );
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpCenterScreen()));
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.shield_outlined, color: Colors.green),
+            title: const Text('How Marketplace Works'),
+            subtitle: const Text('6-step escrow protection guide', style: TextStyle(fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const HowItWorksScreen()));
+            },
+          ),
+
+          // Sign Out Button
+          if (isLoggedIn) ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              onTap: () async {
+                Navigator.pop(context);
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Signed out successfully.')),
+                  );
+                }
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// --- ISOLATED HERO BANNER CAROUSEL ---
+class _HeroBannerCarousel extends StatefulWidget {
+  const _HeroBannerCarousel();
+
+  @override
+  State<_HeroBannerCarousel> createState() => _HeroBannerCarouselState();
+}
+
+class _HeroBannerCarouselState extends State<_HeroBannerCarousel> {
+  final PageController _pageController = PageController();
+  int _currentBannerIndex = 0;
+  Timer? _carouselTimer;
+
+  final List<Map<String, dynamic>> _heroBanners = [
+    {
+      'title': 'Sell Clothes for FREE',
+      'subtitle': '0% seller commission. Turn your wardrobe into cash in 60s.',
+      'tag': '0% COMMISSION',
+      'colors': [Color(0xFF008080), Color(0xFF004D40)],
+      'icon': Icons.sell_outlined,
+    },
+    {
+      'title': '100% Escrow Protection',
+      'subtitle': 'Shop with trust. Funds are released only after parcel delivery.',
+      'tag': 'SAFE SHOPPING',
+      'colors': [Color(0xFF1E3C72), Color(0xFF2A5298)],
+      'icon': Icons.shield_outlined,
+    },
+    {
+      'title': 'Free Local PMB Meetup',
+      'subtitle': 'Collect from neighbors in Pietermaritzburg & save R60 on couriers.',
+      'tag': 'PMB COMMUNITY',
+      'colors': [Color(0xFF512DA8), Color(0xFF673AB7)],
+      'icon': Icons.place_outlined,
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _carouselTimer = Timer.periodic(const Duration(milliseconds: 4500), (timer) {
+      if (_pageController.hasClients) {
+        final nextPage = (_currentBannerIndex + 1) % _heroBanners.length;
+        _pageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _carouselTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 140,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: _heroBanners.length,
+              onPageChanged: (i) => setState(() => _currentBannerIndex = i),
+              itemBuilder: (context, index) {
+                final b = _heroBanners[index];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: b['colors'] as List<Color>,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (b['colors'][0] as Color).withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                b['tag'],
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              b['title'],
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              b['subtitle'],
+                              maxLines: 2,
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(b['icon'] as IconData, size: 54, color: Colors.white.withOpacity(0.85)),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _heroBanners.length,
+              (i) => Container(
+                width: _currentBannerIndex == i ? 18 : 6,
+                height: 5,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: _currentBannerIndex == i ? const Color(0xFF008080) : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -607,7 +679,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
   }
 }
 
-// Product Card
+// --- PRODUCT CARD ---
 class _ProductCard extends StatelessWidget {
   final ListingModel listing;
   const _ProductCard({required this.listing});

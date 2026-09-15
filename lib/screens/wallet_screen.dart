@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import 'main_navigation_shell.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -35,7 +36,19 @@ class _WalletScreenState extends State<WalletScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Market',
+          onPressed: () {
+            // If there is a page behind it, pop back normally.
+            // If the browser was refreshed (no history), jump back to Market Home instead of turning white!
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+              );
+            }
+          },
         ),
       ),
       body: StreamBuilder<DocumentSnapshot>(
