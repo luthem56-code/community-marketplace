@@ -4,8 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AdminService {
   // Put your admin email(s) here so you always have access:
   static const List<String> adminEmails = [
-    // Add your login email here, e.g.:
-    // 'mkhize@example.com',
+    'ntmkhizec@outlook.com', // <-- Put your email here!
   ];
 
   /// Checks if the current user is an authorized admin

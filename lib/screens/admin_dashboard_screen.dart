@@ -1,53 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/whatsapp_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/admin_service.dart';
+import '../services/whatsapp_helper.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF4F6F8),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1E293B), // Premium dark navy admin theme
-          foregroundColor: Colors.white,
-          elevation: 0,
-          title: const Row(
-            children: [
-              Icon(Icons.admin_panel_settings, color: Colors.amber, size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Admin Command Center',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? '';
+
+    // Route Guard: Real-time verification of admin privileges
+    return StreamBuilder<DocumentSnapshot>(
+      stream: uid.isNotEmpty
+          ? FirebaseFirestore.instance.collection('users').doc(uid).snapshots()
+          : null,
+      builder: (context, snapshot) {
+        bool isAdmin = false;
+
+        // 1. Check if email is in the admin email list
+        if (user?.email != null &&
+            AdminService.adminEmails.contains(user!.email!.trim().toLowerCase())) {
+          isAdmin = true;
+        }
+
+        // 2. Check if Firestore role field == 'admin'
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>?;
+          if (data?['role'] == 'admin') {
+            isAdmin = true;
+          }
+        }
+
+        // --- ACCESS DENIED SCREEN (For unauthorized users & guests) ---
+        if (!isAdmin) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              title: const Text('Access Restricted'),
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              elevation: 0.5,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
               ),
-            ],
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.gpp_bad_rounded, size: 72, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Admin Access Required',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This command center is strictly restricted to platform administrators.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF008080),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Return to Market'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // --- AUTHORIZED ADMIN: Renders full command center ---
+        return DefaultTabController(
+          length: 4,
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF4F6F8),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF1E293B), // Dark navy theme
+              foregroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.admin_panel_settings, color: Colors.amber, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Admin Command Center',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
+                ],
+              ),
+              bottom: const TabBar(
+                isScrollable: true,
+                indicatorColor: Colors.amber,
+                indicatorWeight: 3,
+                labelColor: Colors.amber,
+                unselectedLabelColor: Colors.white70,
+                tabs: [
+                  Tab(icon: Icon(Icons.dashboard_outlined, size: 18), text: 'Overview'),
+                  Tab(icon: Icon(Icons.warning_amber_rounded, size: 18), text: 'Disputes'),
+                  Tab(icon: Icon(Icons.account_balance_outlined, size: 18), text: 'EFT Payouts'),
+                  Tab(icon: Icon(Icons.inventory_2_outlined, size: 18), text: 'Listings'),
+                ],
+              ),
+            ),
+            body: const TabBarView(
+              children: [
+                _AdminOverviewTab(),
+                _AdminDisputesTab(),
+                _AdminPayoutsTab(),
+                _AdminListingsTab(),
+              ],
+            ),
           ),
-          bottom: const TabBar(
-            isScrollable: true,
-            indicatorColor: Colors.amber,
-            indicatorWeight: 3,
-            labelColor: Colors.amber,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(icon: Icon(Icons.dashboard_outlined, size: 18), text: 'Overview'),
-              Tab(icon: Icon(Icons.warning_amber_rounded, size: 18), text: 'Disputes'),
-              Tab(icon: Icon(Icons.account_balance_outlined, size: 18), text: 'EFT Payouts'),
-              Tab(icon: Icon(Icons.inventory_2_outlined, size: 18), text: 'Listings'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
-          children: [
-            _AdminOverviewTab(),
-            _AdminDisputesTab(),
-            _AdminPayoutsTab(),
-            _AdminListingsTab(),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
