@@ -425,8 +425,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                       return Text('Wallet: R ${balance.toStringAsFixed(2)} available', style: const TextStyle(color: Colors.white70));
                     },
                   )
-                : Text(email, style: const TextStyle(color: Colors.white70)),
-          ),
+                : Text(email, style: const TextStyle(color: Colors.white70))),
 
           // If Guest: Prominent Sign In Prompt
           if (!isLoggedIn)
