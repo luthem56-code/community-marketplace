@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'how_it_works_screen.dart';
 import 'main_navigation_shell.dart';
@@ -12,6 +14,63 @@ class HelpCenterScreen extends StatefulWidget {
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+
+  void _showContactAdminDialog(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final subjectCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Message Admin Support', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Have a question about an order, courier, or payment? Message our platform admin directly:'),
+            const SizedBox(height: 12),
+            TextField(controller: subjectCtrl, decoration: const InputDecoration(labelText: 'Subject / Order #', border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(controller: msgCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Your Message *', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+            onPressed: () async {
+              final text = msgCtrl.text.trim();
+              if (text.isEmpty) return;
+
+              Navigator.pop(ctx);
+
+              // Save message directly to Firestore support inquiries
+              await FirebaseFirestore.instance.collection('support_inquiries').add({
+                'senderId': user?.uid ?? 'guest',
+                'senderEmail': user?.email ?? 'Unknown',
+                'senderName': user?.displayName ?? 'Community Member',
+                'subject': subjectCtrl.text.trim(),
+                'message': text,
+                'status': 'open',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Color(0xFF008080),
+                    content: Text('Message sent to Admin! We will get back to you shortly. 📩'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Send Message'),
+          ),
+        ],
+      ),
+    );
+  }
 
   // All Promoted Articles from Yaga's Knowledge Base
   final List<Map<String, dynamic>> _articles = [
@@ -410,6 +469,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                   const SizedBox(height: 14),
+                  // Direct In-App Message to Admin Support
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF008080),
@@ -419,12 +479,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     icon: const Icon(Icons.chat_outlined, size: 18),
                     label: const Text('Contact Support Team', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          backgroundColor: Color(0xFF008080),
-                          content: Text('Support inquiry initiated. A team member will respond shortly.'),
-                        ),
-                      );
+                      _showContactAdminDialog(context);
                     },
                   ),
                 ],

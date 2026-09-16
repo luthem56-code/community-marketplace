@@ -27,8 +27,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isProcessing = false;
 
   // Platform Fee Formula: 5% of item price + R15 flat
-  double get _buyerProtectionFee => (widget.listing.price * 0.05) + 15.0;
-  double get _totalAmount => widget.listing.price + _selectedShipping.price + _buyerProtectionFee;
+ String? _appliedPromoCode;
+  int _discountPercentage = 0;
+  final TextEditingController _promoCtrl = TextEditingController();
+
+  double get _discountAmount => (widget.listing.price * (_discountPercentage / 100));
+  double get _effectiveItemPrice => widget.listing.price - _discountAmount;
+  double get _buyerProtectionFee => (_effectiveItemPrice * 0.05) + 15.0;
+  double get _totalAmount => _effectiveItemPrice + _selectedShipping.price + _buyerProtectionFee;
 
   @override
   void initState() {
@@ -326,7 +332,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Delivery & Recipient Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        // --- FIND ON MAP BUTTON ---
+                        
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Recipient Full Name *',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (val) => val == null || val.isEmpty ? 'Name required' : null,
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'SA Cellphone Number (for Courier SMS / OTP) *',
+                        hintText: 'e.g. 082 123 4567',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Phone number required for courier pin';
+                        if (val.replaceAll(' ', '').length < 10) return 'Enter a valid 10-digit number';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // --- FIND ON MAP BUTTON ---
                         TextButton.icon(
                           style: TextButton.styleFrom(
                             foregroundColor: const Color(0xFF008080),
@@ -361,40 +400,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             }
                           },
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Recipient Full Name *',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      validator: (val) => val == null || val.isEmpty ? 'Name required' : null,
-                    ),
-                    const SizedBox(height: 10),
-
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'SA Cellphone Number (for Courier SMS / OTP) *',
-                        hintText: 'e.g. 082 123 4567',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Phone number required for courier pin';
-                        if (val.replaceAll(' ', '').length < 10) return 'Enter a valid 10-digit number';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 10),
-
                     // Address / Drop-point input with Auto-fill indicator
                     TextFormField(
                       controller: _addressController,
@@ -414,22 +419,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 24),
                     const SizedBox(height: 10),
-                    TextFormField(
-                      controller: _addressController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: _selectedShipping.method.contains('Pudo')
-                            ? 'Pudo Locker Location / Address *'
-                            : _selectedShipping.method.contains('PAXI')
-                                ? 'PEP Store Branch Name / Code *'
-                                : 'Delivery Address *',
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      validator: (val) => val == null || val.isEmpty ? 'Delivery location details required' : null,
+                    // Promo Code Box
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _promoCtrl,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: 'Shop Promo Code',
+                              hintText: 'e.g. SARAH15',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+                          onPressed: () async {
+                            final code = _promoCtrl.text.trim().toUpperCase();
+                            if (code.isEmpty) return;
+
+                            final snap = await FirebaseFirestore.instance
+                                .collection('discount_codes')
+                                .where('sellerId', isEqualTo: widget.listing.sellerId)
+                                .where('code', isEqualTo: code)
+                                .where('isActive', isEqualTo: true)
+                                .get();
+
+                            if (snap.docs.isNotEmpty) {
+                              final percent = snap.docs.first.data()['discountPercent'] as int;
+                              setState(() {
+                                _appliedPromoCode = code;
+                                _discountPercentage = percent;
+                              });
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(backgroundColor: Colors.green, content: Text('$percent% Discount Applied! 🎉')),
+                                );
+                              }
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Invalid code for this shop')),
+                                );
+                              }
+                            }
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
                     // --- 4. Order Price Breakdown ---
                     const Text('Price Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

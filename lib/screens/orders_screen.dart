@@ -1,3 +1,4 @@
+import 'package:community_marketplace/services/whatsapp_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -567,6 +568,15 @@ class _OrderCard extends StatelessWidget {
                   .collection('orders')
                   .doc(orderId)
                   .update({'status': 'shipped', 'trackingNumber': ctrl.text.trim()});
+
+              await WhatsAppHelper.sendNotification(
+                recipientUserId: order['buyerId'] ?? '',
+                title: 'Parcel Shipped! 🚚',
+                message: 'Your order "${order['itemTitle']}" is on the way via ${order['shippingMethod']}. Tracking/PIN: ${ctrl.text.trim()}',
+                type: 'shipping',
+                targetId: orderId,
+              );
+
               if (context.mounted) Navigator.pop(ctx);
             },
             child: const Text('Confirm Shipped'),
@@ -581,16 +591,11 @@ class _OrderCard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Receipt & Release Funds?'),
-        content: Text(
-          'Are you happy with the item?\n\nConfirming will release R${payout.toStringAsFixed(2)} directly from escrow to the seller.',
-        ),
+        content: Text('Confirming will release R${payout.toStringAsFixed(2)} directly to the seller.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Not Yet')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
             onPressed: () async {
               final batch = FirebaseFirestore.instance.batch();
               batch.update(FirebaseFirestore.instance.collection('orders').doc(orderId), {'status': 'completed'});
@@ -600,11 +605,87 @@ class _OrderCard extends StatelessWidget {
                 SetOptions(merge: true),
               );
               await batch.commit();
-              if (context.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                Navigator.pop(ctx);
+                _showReviewDialog(context); // <-- PROMPT REVIEW!
+              }
             },
             child: const Text('Yes, Release Funds'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReviewDialog(BuildContext context) {
+    int rating = 5;
+    final commentCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('Rate Your Experience ⭐', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('How was the item accuracy and communication with the seller?'),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    icon: Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 32,
+                    ),
+                    onPressed: () => setDialogState(() => rating = index + 1),
+                  );
+                }),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: commentCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Loved the dress! Fast shipping and clean condition.',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Skip')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
+              onPressed: () async {
+                final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'Community Buyer';
+
+                await FirebaseFirestore.instance.collection('reviews').add({
+                  'orderId': orderId,
+                  'sellerId': order['sellerId'],
+                  'buyerId': currentUid,
+                  'buyerName': currentName,
+                  'rating': rating,
+                  'comment': commentCtrl.text.trim(),
+                  'itemTitle': order['itemTitle'],
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+
+                if (context.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Thank you for leaving a community review! 🎉')),
+                  );
+                }
+              },
+              child: const Text('Submit Review'),
+            ),
+          ],
+        ),
       ),
     );
   }

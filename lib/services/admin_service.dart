@@ -2,9 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminService {
-  // Put your admin email(s) here so you always have access:
+  // Put your login email here (case-insensitive):
   static const List<String> adminEmails = [
-    'ntmkhizec@outlook.com', // <-- Put your email here!
+    'ntmkhizec@outlook.com'
   ];
 
   /// Checks if the current user is an authorized admin
@@ -12,12 +12,13 @@ class AdminService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.isAnonymous) return false;
 
-    // 1. Check if email is in the admin email list
-    if (user.email != null && adminEmails.contains(user.email!.trim().toLowerCase())) {
+    // 1. Check email list
+    if (user.email != null &&
+        adminEmails.contains(user.email!.trim().toLowerCase())) {
       return true;
     }
 
-    // 2. Check role field in Firestore: users/{uid} -> role == 'admin'
+    // 2. Check role == 'admin' in Firestore
     try {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (doc.exists) {

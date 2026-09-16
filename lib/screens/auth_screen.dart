@@ -13,6 +13,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _rememberMe = true;
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -237,6 +238,18 @@ class _AuthScreenState extends State<AuthScreen> {
                   validator: (val) => val == null || val.length < 6 ? 'Password must be at least 6 characters' : null,
                 ),
                 const SizedBox(height: 24),
+                // Remember Me Checkbox
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      activeColor: const Color(0xFF008080),
+                      onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                    ),
+                    const Text('Remember me on this device', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+                const SizedBox(height: 14),
 
                 // Submit Button
                 SizedBox(

@@ -1,19 +1,20 @@
 import 'dart:async';
-import 'package:community_marketplace/screens/admin_dashboard_screen.dart';
-import 'package:community_marketplace/screens/auth_screen.dart';
-import 'package:community_marketplace/services/admin_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/listing_model.dart';
 import 'listing_detail_screen.dart';
-import 'orders_screen.dart';
 import 'wallet_screen.dart';
 import 'create_listing_screen.dart';
-import 'user_profile_screen.dart';
+import 'wishlist_screen.dart';
+import 'sales_screen.dart';
+import 'my_listings_manager_screen.dart';
 import 'help_center_screen.dart';
 import 'how_it_works_screen.dart';
-import 'notifications_screen.dart';
+import 'auth_screen.dart';
+import 'admin_dashboard_screen.dart';
+import '../services/admin_service.dart';
 
 class MarketplaceFeedScreen extends StatefulWidget {
   const MarketplaceFeedScreen({super.key});
@@ -92,48 +93,15 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
           ),
         ),
         actions: [
-          // --- LIVE NOTIFICATION BELL WITH BADGE ---
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('notifications')
-                .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
-                .where('isRead', isEqualTo: false)
-                .snapshots(),
-            builder: (context, snap) {
-              final unreadCount = snap.data?.docs.length ?? 0;
-
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
-                    tooltip: 'Notifications',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                ],
-              );
+          // Yaga Top Right 1: Liked Items / Wishlist Heart
+          IconButton(
+            icon: const Icon(Icons.favorite_border, color: Colors.black87),
+            tooltip: 'Liked Items',
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const WishlistScreen()));
             },
           ),
+          // Yaga Top Right 2: My Wallet
           IconButton(
             icon: const Icon(Icons.account_balance_wallet_outlined, color: Colors.black87),
             tooltip: 'My Wallet',
@@ -141,16 +109,8 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined, color: Colors.black87),
-            tooltip: 'My Orders',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
-            },
-          ),
         ],
       ),
-
       body: CustomScrollView(
         slivers: [
           // 1. Search Bar
@@ -189,7 +149,7 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             ),
           ),
 
-          // 2. Isolated Hero Promotional Carousel (Will NEVER flip or rebuild the feed below!)
+          // 2. Isolated Hero Promotional Carousel (Never flips or jitters the feed below!)
           const SliverToBoxAdapter(
             child: _HeroBannerCarousel(),
           ),
@@ -341,7 +301,8 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                   final data = d.data() as Map<String, dynamic>;
                   final title = (data['title'] ?? '').toString().toLowerCase();
                   final brand = (data['brand'] ?? '').toString().toLowerCase();
-                  return title.contains(_searchQuery) || brand.contains(_searchQuery);
+                  final desc = (data['description'] ?? '').toString().toLowerCase();
+                  return title.contains(_searchQuery) || brand.contains(_searchQuery) || desc.contains(_searchQuery);
                 }).toList();
               }
 
@@ -399,7 +360,6 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // User Header
           UserAccountsDrawerHeader(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -427,9 +387,9 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                       return Text('Wallet: R ${balance.toStringAsFixed(2)} available', style: const TextStyle(color: Colors.white70));
                     },
                   )
-                : Text(email, style: const TextStyle(color: Colors.white70))),
+                : Text(email, style: const TextStyle(color: Colors.white70)),
+          ),
 
-          // If Guest: Prominent Sign In Prompt
           if (!isLoggedIn)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -446,67 +406,11 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
                 },
               ),
             ),
-            // Inside Drawer list items in marketplace_feed_screen.dart:
-          // --- ADMIN-ONLY ENTRY (COMPLETELY INVISIBLE TO REGULAR USERS & GUESTS) ---
-          if (isLoggedIn)
-            StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
-              builder: (context, userSnap) {
-                bool isAdmin = false;
-
-                // Check admin email list
-                if (user?.email != null && AdminService.adminEmails.contains(user!.email!.trim().toLowerCase())) {
-                  isAdmin = true;
-                }
-
-                // Check role in Firestore
-                if (userSnap.hasData && userSnap.data!.exists) {
-                  final data = userSnap.data!.data() as Map<String, dynamic>?;
-                  if (data?['role'] == 'admin') {
-                    isAdmin = true;
-                  }
-                }
-
-                // If NOT admin, return completely empty (hidden!)
-                if (!isAdmin) return const SizedBox.shrink();
-
-                // ONLY ADMIN SEES THIS:
-                return Column(
-                  children: [
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.admin_panel_settings, color: Colors.amber),
-                      title: const Text(
-                        'Admin Command Center',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                      ),
-                      subtitle: const Text('Authorized Admin Only', style: TextStyle(fontSize: 11)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
-          const Divider(),
 
           ListTile(
             leading: const Icon(Icons.storefront, color: Color(0xFF008080)),
             title: const Text('Browse Market'),
             onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF008080)),
-            title: const Text('Wallet & Payouts (EFT)'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
-            },
           ),
           ListTile(
             leading: const Icon(Icons.add_circle_outline, color: Color(0xFF008080)),
@@ -521,19 +425,94 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.person_outline, color: Color(0xFF008080)),
-            title: const Text('My Closet & Listings'),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.local_mall_outlined, color: Color(0xFF008080)),
-            title: const Text('Orders & Offers'),
+            leading: const Icon(Icons.inventory_2_outlined, color: Color(0xFF008080)),
+            title: const Text('My Shop Listings'),
+            subtitle: const Text('Manage active wardrobe items & prices', style: TextStyle(fontSize: 11)),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen()));
+              if (!isLoggedIn) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MyListingsManagerScreen()));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.local_shipping_outlined, color: Color(0xFF008080)),
+            title: const Text('My Sales (To Ship)'),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SalesScreen()));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF008080)),
+            title: const Text('My Purchases (Bought)'),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Purchases are currently unavailable.')),
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF008080)),
+            title: const Text('Wallet & Payouts (EFT)'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletScreen()));
             },
           ),
           const Divider(),
+
+          // --- ADMIN-ONLY ENTRY (COMPLETELY INVISIBLE TO NON-ADMINS) ---
+          if (isLoggedIn)
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+              builder: (context, userSnap) {
+                bool isAdmin = false;
+
+                if (user?.email != null && AdminService.adminEmails.contains(user!.email!.trim().toLowerCase())) {
+                  isAdmin = true;
+                }
+
+                if (userSnap.hasData && userSnap.data!.exists) {
+                  final data = userSnap.data!.data() as Map<String, dynamic>?;
+                  if (data?['role'] == 'admin') {
+                    isAdmin = true;
+                  }
+                }
+
+                if (!isAdmin) return const SizedBox.shrink();
+
+                return Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.admin_panel_settings, color: Colors.amber),
+                      title: const Text(
+                        'Admin Command Center',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      ),
+                      subtitle: const Text('Disputes, payouts & moderation', style: TextStyle(fontSize: 11)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+                      },
+                    ),
+                    const Divider(),
+                  ],
+                );
+              },
+            ),
+
           ListTile(
             leading: const Icon(Icons.help_center_outlined, color: Color(0xFF008080)),
             title: const Text('Help Center & Guides'),
@@ -552,24 +531,6 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const HowItWorksScreen()));
             },
           ),
-
-          // Sign Out Button
-          if (isLoggedIn) ...[
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Sign Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              onTap: () async {
-                Navigator.pop(context);
-                await FirebaseAuth.instance.signOut();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Signed out successfully.')),
-                  );
-                }
-              },
-            ),
-          ],
         ],
       ),
     );
@@ -728,13 +689,16 @@ class _HeroBannerCarouselState extends State<_HeroBannerCarousel> {
   }
 }
 
-// --- PRODUCT CARD ---
+// --- PRODUCT CARD WITH LIVE TOTAL LIKES COUNTER ---
 class _ProductCard extends StatelessWidget {
   final ListingModel listing;
   const _ProductCard({required this.listing});
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final bool isLoggedIn = user != null && !user.isAnonymous;
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -758,6 +722,7 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Item Image with Size Badge & Realtime Wishlist Heart + Live Counter
             Expanded(
               child: Stack(
                 children: [
@@ -770,6 +735,8 @@ class _ProductCard extends StatelessWidget {
                           )
                         : Container(color: Colors.grey.shade200),
                   ),
+
+                  // 1. Size Badge (Top Left)
                   Positioned(
                     top: 8,
                     left: 8,
@@ -785,9 +752,102 @@ class _ProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // 2. Interactive Favorite Heart + Live Counter Badge (Top Right)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream: isLoggedIn
+                          ? FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('favorites')
+                              .doc(listing.id)
+                              .snapshots()
+                          : null,
+                      builder: (context, favSnap) {
+                        final isFavorite = favSnap.hasData && favSnap.data!.exists;
+
+                        return StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance.collection('listings').doc(listing.id).snapshots(),
+                          builder: (context, listingSnap) {
+                            int totalLikes = 0;
+                            if (listingSnap.hasData && listingSnap.data!.exists) {
+                              final data = listingSnap.data!.data() as Map<String, dynamic>?;
+                              totalLikes = (data?['likesCount'] as num?)?.toInt() ?? 0;
+                            }
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.45),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: InkWell(
+                                onTap: () async {
+                                  if (!isLoggedIn) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                                    );
+                                    return;
+                                  }
+
+                                  final favDoc = FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .collection('favorites')
+                                      .doc(listing.id);
+
+                                  final listingDoc = FirebaseFirestore.instance
+                                      .collection('listings')
+                                      .doc(listing.id);
+
+                                  if (isFavorite) {
+                                    await favDoc.delete();
+                                    await listingDoc.update({'likesCount': FieldValue.increment(-1)});
+                                  } else {
+                                    await favDoc.set({
+                                      'listingId': listing.id,
+                                      'createdAt': FieldValue.serverTimestamp(),
+                                    });
+                                    await listingDoc.update({'likesCount': FieldValue.increment(1)});
+                                  }
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                                      color: isFavorite ? Colors.red : Colors.white,
+                                      size: 15,
+                                    ),
+                                    if (totalLikes > 0) ...[
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$totalLikes',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
+
+            // Item Details
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Column(

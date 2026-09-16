@@ -7,10 +7,10 @@ import 'package:uuid/uuid.dart';
 import '../models/listing_model.dart';
 import '../models/offer_model.dart';
 import 'checkout_screen.dart';
-import 'auth_screen.dart';
 import 'chat_screen.dart';
 import 'seller_shop_screen.dart';
 import 'how_it_works_screen.dart';
+import 'auth_screen.dart';
 import '../services/whatsapp_helper.dart';
 
 class ListingDetailScreen extends StatefulWidget {
@@ -30,7 +30,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     final item = widget.listing;
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    // Realtime listener to check if THIS logged-in user has an ACCEPTED offer on this item
+    // 1. Stream 1: Check if THIS buyer has an ACCEPTED offer
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('offers')
@@ -39,7 +39,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           .where('status', isEqualTo: 'accepted')
           .snapshots(),
       builder: (context, offerSnapshot) {
-        // If an accepted offer exists, use that lower price!
         double effectivePrice = item.price;
         bool hasAcceptedOffer = false;
 
@@ -49,7 +48,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           hasAcceptedOffer = true;
         }
 
-        // Create the active listing instance with the effective price
         final activeListing = ListingModel(
           id: item.id,
           sellerId: item.sellerId,
@@ -60,399 +58,398 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           size: item.size,
           brand: item.brand,
           condition: item.condition,
-          price: effectivePrice, // Automatically carries discounted price to checkout!
+          price: effectivePrice,
           imageUrls: item.imageUrls,
           shippingOptions: item.shippingOptions,
           createdAt: item.createdAt,
         );
 
-        return Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.black),
-                tooltip: 'Share Item',
-                onPressed: () => _showShareSheet(context, item),
-              ),
-            ],
-          ),
-          body: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Photo Carousel
-                Stack(
-                  children: [
-                    SizedBox(
-                      height: 380,
-                      width: double.infinity,
-                      child: item.imageUrls.isNotEmpty
-                          ? PageView.builder(
-                              itemCount: item.imageUrls.length,
-                              onPageChanged: (index) => setState(() => _currentImageIndex = index),
-                              itemBuilder: (context, index) {
-                                return Image.network(
-                                  item.imageUrls[index],
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Colors.grey.shade200,
-                                    child: const Icon(Icons.broken_image, size: 60),
-                                  ),
-                                );
-                              },
-                            )
-                          : Container(color: Colors.grey.shade200, child: const Icon(Icons.image, size: 60)),
-                    ),
-                    if (item.imageUrls.length > 1)
-                      Positioned(
-                        bottom: 12,
-                        left: 0,
-                        right: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            item.imageUrls.length,
-                            (index) => Container(
-                              width: 8,
-                              height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _currentImageIndex == index ? const Color(0xFF008080) : Colors.white.withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+        // 2. Stream 2: Check if SELLER is in HOLIDAY MODE
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').doc(item.sellerId).snapshots(),
+          builder: (context, sellerSnap) {
+            bool isSellerOnHoliday = false;
+            if (sellerSnap.hasData && sellerSnap.data!.exists) {
+              final data = sellerSnap.data!.data() as Map<String, dynamic>?;
+              isSellerOnHoliday = data?['isHolidayMode'] ?? false;
+            }
+
+            return Scaffold(
+              backgroundColor: Colors.white,
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.black),
+                  onPressed: () => Navigator.pop(context),
                 ),
-
-                // 2. Title & Dynamic Price Section
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Accepted Offer Alert Banner
-                      if (hasAcceptedOffer)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.local_offer, color: Colors.green.shade800, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Special Offer Accepted! You save R${(item.price - effectivePrice).toStringAsFixed(0)}',
-                                  style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      // Price Display
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            'R ${effectivePrice.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF008080),
-                            ),
-                          ),
-                          if (hasAcceptedOffer) ...[
-                            const SizedBox(width: 10),
-                            Text(
-                              'R ${item.price.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade500,
-                                decoration: TextDecoration.lineThrough,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(item.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 14),
-
-                      // Item Spec Badges
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _specBadge(Icons.straighten, 'Size: ${item.size}'),
-                          _specBadge(Icons.sell_outlined, 'Brand: ${item.brand}'),
-                          _specBadge(Icons.verified_outlined, item.condition.label),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      const Divider(),
-
-                      // 3. Description
-                      const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(item.description, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4)),
-                      const SizedBox(height: 20),
-                      const Divider(),
-
-                      // 4. Delivery Methods
-                      const Text('Available Delivery Options', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      ...item.shippingOptions.map(
-                        (opt) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFF008080)),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(opt.method, style: const TextStyle(fontSize: 14))),
-                              Text(
-                                opt.price == 0 ? 'FREE' : 'R ${opt.price.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: opt.price == 0 ? Colors.green.shade800 : Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // 5. Seller Closet Card
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SellerShopScreen(sellerId: item.sellerId, shopName: 'Neighbor Closet'),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: const Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Color(0xFF008080),
-                                child: Icon(Icons.person, color: Colors.white, size: 24),
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Neighbor Closet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                    SizedBox(height: 2),
-                                    Text('Verified Resident • 5.0 ⭐ (14 sales)', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                                  ],
-                                ),
-                              ),
-                              Icon(Icons.chevron_right, color: Colors.black45),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // 6. Buyer Protection Box
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const HowItWorksScreen()));
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F2F2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
-                          ),
-                          child: const Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Community Buyer Protection', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF008080))),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'Money is held securely in escrow. Funds are released only after you receive and confirm your item. Tap to learn how it works.',
-                                      style: TextStyle(fontSize: 12, color: Colors.black87),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(Icons.chevron_right, size: 18, color: Color(0xFF008080)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 7. Sticky Bottom Action Bar
-          bottomNavigationBar: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -3)),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  // In-App Chat
+                actions: [
                   IconButton(
-                    style: IconButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF008080)),
-                    tooltip: 'In-App Chat',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            listing: item,
-                            otherUserId: item.sellerId,
-                            otherUserName: 'Seller Closet',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-
-                  // WhatsApp Ping
-                  IconButton(
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFE8F5E9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    icon: const Icon(Icons.chat, color: Colors.green),
-                    tooltip: 'Chat on WhatsApp',
-                    onPressed: () {
-                      WhatsAppHelper.openChat(
-                        context: context,
-                        rawPhone: '0821234567',
-                        itemTitle: item.title,
-                        itemPrice: effectivePrice,
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Make Offer button (or Show "Offer Accepted" badge)
-                  if (!hasAcceptedOffer)
-                    // Make Offer button with Auth check
-                  if (!hasAcceptedOffer)
-                    Expanded(
-                      flex: 2,
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Color(0xFF008080), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () async {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user == null || user.isAnonymous) {
-                            final loggedIn = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(builder: (_) => const AuthScreen()),
-                            );
-                            if (loggedIn != true || !mounted) return;
-                          }
-                          _showMakeOfferDialog(context, item);
-                        },
-                        child: const Text('Make Offer', style: TextStyle(color: Color(0xFF008080), fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  if (hasAcceptedOffer) const SizedBox(width: 4),
-
-                  // Buy Now button (Passes the discounted price straight to Checkout!)
-                  // Buy Now button with Automatic Auth Intercept & Resume
-                  Expanded(
-                    flex: hasAcceptedOffer ? 5 : 3,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: hasAcceptedOffer ? Colors.green.shade700 : const Color(0xFF008080),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () async {
-                        final user = FirebaseAuth.instance.currentUser;
-                        // 1. If not logged in (or guest), send to Auth Screen:
-                        if (user == null || user.isAnonymous) {
-                          final loggedIn = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AuthScreen()),
-                          );
-                          // If they didn't finish logging in, stop here
-                          if (loggedIn != true || !mounted) return;
-                        }
-
-                        // 2. Once logged in, the item is still waiting -> Go straight to Checkout!
-                        if (!mounted) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CheckoutScreen(listing: activeListing),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        hasAcceptedOffer ? 'Buy at Offer: R${effectivePrice.toStringAsFixed(0)}' : 'Buy Now',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    icon: const Icon(Icons.share_outlined, color: Colors.black),
+                    tooltip: 'Share Item',
+                    onPressed: () => _showShareSheet(context, item),
                   ),
                 ],
               ),
-            ),
-          ),
+              body: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- HOLIDAY MODE BANNER (TOP OF LISTING) ---
+                    if (isSellerOnHoliday)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        color: Colors.amber.shade100,
+                        child: const Row(
+                          children: [
+                            Icon(Icons.beach_access, color: Colors.orange, size: 22),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '🌴 Seller is currently on Holiday. Purchases and offers are temporarily paused.',
+                                style: TextStyle(color: Color(0xFF78350F), fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Photo Carousel
+                    Stack(
+                      children: [
+                        SizedBox(
+                          height: 380,
+                          width: double.infinity,
+                          child: item.imageUrls.isNotEmpty
+                              ? PageView.builder(
+                                  itemCount: item.imageUrls.length,
+                                  onPageChanged: (index) => setState(() => _currentImageIndex = index),
+                                  itemBuilder: (context, index) {
+                                    return Image.network(
+                                      item.imageUrls[index],
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        color: Colors.grey.shade200,
+                                        child: const Icon(Icons.broken_image, size: 60),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(color: Colors.grey.shade200, child: const Icon(Icons.image, size: 60)),
+                        ),
+                        if (item.imageUrls.length > 1)
+                          Positioned(
+                            bottom: 12,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                item.imageUrls.length,
+                                (index) => Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentImageIndex == index ? const Color(0xFF008080) : Colors.white.withOpacity(0.7),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    // Title & Price Section
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasAcceptedOffer)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade300),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.local_offer, color: Colors.green.shade800, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Special Offer Accepted! You save R${(item.price - effectivePrice).toStringAsFixed(0)}',
+                                      style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                'R ${effectivePrice.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF008080)),
+                              ),
+                              if (hasAcceptedOffer) ...[
+                                const SizedBox(width: 10),
+                                Text(
+                                  'R ${item.price.toStringAsFixed(0)}',
+                                  style: TextStyle(fontSize: 18, color: Colors.grey.shade500, decoration: TextDecoration.lineThrough, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(item.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 14),
+
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _specBadge(Icons.straighten, 'Size: ${item.size}'),
+                              _specBadge(Icons.sell_outlined, 'Brand: ${item.brand}'),
+                              _specBadge(Icons.verified_outlined, item.condition.label),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          const Divider(),
+
+                          const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text(item.description, style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4)),
+                          const SizedBox(height: 20),
+                          const Divider(),
+
+                          const Text('Available Delivery Options', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          ...item.shippingOptions.map(
+                            (opt) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFF008080)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(opt.method, style: const TextStyle(fontSize: 14))),
+                                  Text(
+                                    opt.price == 0 ? 'FREE' : 'R ${opt.price.toStringAsFixed(2)}',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: opt.price == 0 ? Colors.green.shade800 : Colors.black87),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Seller Shop Card
+                          InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SellerShopScreen(sellerId: item.sellerId, shopName: 'Neighbor Closet'),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+                              child: const Row(
+                                children: [
+                                  CircleAvatar(radius: 22, backgroundColor: Color(0xFF008080), child: Icon(Icons.person, color: Colors.white, size: 24)),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Neighbor Closet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        SizedBox(height: 2),
+                                        Text('Verified Resident • 5.0 ⭐', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right, color: Colors.black45),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Buyer Protection Guarantee
+                          InkWell(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HowItWorksScreen())),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: const Color(0xFFE6F2F2), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF008080).withOpacity(0.3))),
+                              child: const Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.shield_outlined, color: Color(0xFF008080), size: 24),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Community Buyer Protection', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF008080))),
+                                        SizedBox(height: 2),
+                                        Text('Money is held securely in escrow until you confirm delivery.', style: TextStyle(fontSize: 12, color: Colors.black87)),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right, size: 18, color: Color(0xFF008080)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // --- BOTTOM BAR: DISABLED IF SELLER IS ON HOLIDAY ---
+              bottomNavigationBar: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -3)),
+                  ],
+                ),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      // In-App Chat (Always enabled so buyer can ask questions)
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF008080)),
+                        tooltip: 'In-App Chat',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                listing: item,
+                                otherUserId: item.sellerId,
+                                otherUserName: 'Seller Closet',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 6),
+
+                      // WhatsApp Ping
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8F5E9),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        icon: const Icon(Icons.chat, color: Colors.green),
+                        tooltip: 'Chat on WhatsApp',
+                        onPressed: () {
+                          WhatsAppHelper.openChat(
+                            context: context,
+                            rawPhone: '0821234567',
+                            itemTitle: item.title,
+                            itemPrice: effectivePrice,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Make Offer Button (Disabled if on holiday)
+                      if (!hasAcceptedOffer)
+                        Expanded(
+                          flex: 2,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(color: isSellerOnHoliday ? Colors.grey : const Color(0xFF008080), width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: isSellerOnHoliday
+                                ? null
+                                : () async {
+                                    final user = FirebaseAuth.instance.currentUser;
+                                    if (user == null || user.isAnonymous) {
+                                      final loggedIn = await Navigator.push<bool>(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const AuthScreen()),
+                                      );
+                                      if (loggedIn != true || !mounted) return;
+                                    }
+                                    _showMakeOfferDialog(context, item);
+                                  },
+                            child: Text('Make Offer', style: TextStyle(color: isSellerOnHoliday ? Colors.grey : const Color(0xFF008080), fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      if (hasAcceptedOffer) const SizedBox(width: 4),
+
+                      // Buy Now Button (Disabled if on holiday)
+                      Expanded(
+                        flex: hasAcceptedOffer ? 5 : 3,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSellerOnHoliday
+                                ? Colors.grey.shade400
+                                : (hasAcceptedOffer ? Colors.green.shade700 : const Color(0xFF008080)),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: isSellerOnHoliday
+                              ? null // PAUSED!
+                              : () async {
+                                  final user = FirebaseAuth.instance.currentUser;
+                                  if (user == null || user.isAnonymous) {
+                                    final loggedIn = await Navigator.push<bool>(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                                    );
+                                    if (loggedIn != true || !mounted) return;
+                                  }
+
+                                  if (!mounted) return;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => CheckoutScreen(listing: activeListing),
+                                    ),
+                                  );
+                                },
+                          child: Text(
+                            isSellerOnHoliday
+                                ? 'Seller on Holiday 🌴'
+                                : (hasAcceptedOffer ? 'Buy at Offer: R${effectivePrice.toStringAsFixed(0)}' : 'Buy Now'),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -542,7 +539,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
                   await FirebaseFirestore.instance.collection('offers').doc(offerId).set(newOffer.toMap());
 
-                  // Send in-app notification to seller
                   await WhatsAppHelper.sendNotification(
                     recipientUserId: item.sellerId,
                     title: 'New Offer Received! 🏷️',
