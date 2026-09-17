@@ -41,6 +41,10 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
     'Country Road',
     'Foschini',
     'Mr Price',
+    'Forever New',
+    'Puma',
+    'Under Armour',
+    'Reebok',
   ];
 
   final List<Map<String, dynamic>> _categoryChips = [
@@ -52,6 +56,13 @@ class _MarketplaceFeedScreenState extends State<MarketplaceFeedScreen> {
     {'name': 'Accessories', 'icon': Icons.watch_rounded},
     {'name': 'Shoes', 'icon': Icons.roller_skating_outlined},
     {'name': 'Home', 'icon': Icons.chair_rounded},
+    {'name': 'Electronics', 'icon': Icons.devices_other_rounded},
+    {'name': 'Sports & Outdoors', 'icon': Icons.sports_soccer_rounded},
+    {'name': 'Toys & Games', 'icon': Icons.toys_rounded},
+    {'name': 'Books & Media', 'icon': Icons.menu_book_rounded},
+    {'name': 'Health & Wellness', 'icon': Icons.health_and_safety_rounded},
+    {'name': 'Automotive & Vehicles', 'icon': Icons.directions_car_rounded},
+    {'name': 'Travel & Experiences', 'icon': Icons.flight_takeoff_rounded},
   ];
 
   @override

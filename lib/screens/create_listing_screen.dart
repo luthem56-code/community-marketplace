@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:community_marketplace/widgets/delivery_info_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +7,8 @@ import 'package:uuid/uuid.dart';
 
 import '../models/listing_model.dart';
 import '../services/media_service.dart';
+import '../constants/yaga_categories.dart';
+import '../widgets/delivery_info_sheet.dart';
 
 class CreateListingScreen extends StatefulWidget {
   const CreateListingScreen({super.key});
@@ -24,7 +25,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final List<File> _selectedImages = [];
   bool _isLoading = false;
 
-  // Form Fields
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
@@ -32,39 +32,28 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
   final _sizeController = TextEditingController();
 
   String _selectedCategory = 'Women';
+  String _selectedSubCategory = 'Dresses';
   ItemCondition _selectedCondition = ItemCondition.good;
   bool _allowBundling = true;
 
-  // --- YAGA COURIER STATE ---
-  // 1. The Courier Guy Locker & Kiosk (Pudo)
+  // Courier Guy (Pudo)
   bool _enableCourierGuy = true;
   double _courierGuyPrice = 64.0;
   String _courierGuySize = 'Small (600x410x80 mm)';
 
-  // 2. Pargo Store-to-Store
+  // Pargo
   bool _enablePargo = false;
   double _pargoPrice = 59.0;
   String _pargoSize = 'Small parcel (up to 5kg)';
 
-  // 3. PAXI Speed Service (PEP)
+  // PAXI
   bool _enablePaxi = true;
   double _paxiPrice = 49.0;
   String _paxiSize = 'Standard parcel (450x370 mm)';
 
-  // 4. Fixed Couriers
+  // Other Couriers
   bool _enablePostNet = false;
-  bool _enableAramex = false;
-  bool _enablePickup = true; // Free Local PMB Collection
-
-  final List<String> _categories = [
-    'Women',
-    'Men',
-    'Kids & Babies',
-    'Beauty & Care',
-    'Accessories',
-    'Shoes',
-    'Home',
-  ];
+  bool _enablePickup = true;
 
   final List<String> _photoSlotNames = [
     'Cover photo *',
@@ -74,6 +63,17 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
     'Extra photo',
     'Extra photo',
   ];
+
+  List<String> get _categories =>
+      YagaCategories.all.map((c) => c['title'] as String).toList();
+
+  List<String> get _currentSubCategories {
+    final cat = YagaCategories.all.firstWhere(
+      (c) => c['title'] == _selectedCategory,
+      orElse: () => YagaCategories.all.first,
+    );
+    return List<String>.from(cat['sub'] as List);
+  }
 
   Future<void> _pickImageForSlot(int slotIndex) async {
     final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
@@ -104,7 +104,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       return;
     }
 
-    if (!_enableCourierGuy && !_enablePargo && !_enablePaxi && !_enablePostNet && !_enableAramex && !_enablePickup) {
+    if (!_enableCourierGuy &&
+        !_enablePargo &&
+        !_enablePaxi &&
+        !_enablePostNet &&
+        !_enablePickup) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enable at least one delivery option.')),
       );
@@ -121,7 +125,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         sellerId: user.uid,
       );
 
-      // Build active delivery options matrix with selected parcel sizes
       final List<ShippingOption> activeShipping = [];
 
       if (_enableCourierGuy) {
@@ -148,9 +151,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
       if (_enablePostNet) {
         activeShipping.add(ShippingOption(method: 'PostNet-to-PostNet', price: 109.0, isEnabled: true));
       }
-      if (_enableAramex) {
-        activeShipping.add(ShippingOption(method: 'Aramex Store-to-Door', price: 99.99, isEnabled: true));
-      }
       if (_enablePickup) {
         activeShipping.add(ShippingOption(method: 'Pick up from Seller (Local PMB Collection)', price: 0.0, isEnabled: true));
       }
@@ -162,7 +162,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         title: _titleController.text.trim(),
         description: _descController.text.trim(),
         category: _selectedCategory,
-        subCategory: 'General',
+        subCategory: _selectedSubCategory, // Saved to Firestore!
         size: _sizeController.text.trim(),
         brand: _brandController.text.trim().isEmpty ? 'Unbranded' : _brandController.text.trim(),
         condition: _selectedCondition,
@@ -232,7 +232,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- SECTION 1: UPLOAD PHOTOS ---
                     const Text('Upload photos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     const Text('First photo is your cover picture. Add up to 6 photos.', style: TextStyle(color: Colors.black54, fontSize: 12)),
@@ -309,7 +308,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Photo Tips Banner
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -331,7 +329,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- SECTION 2: ITEM DETAILS ---
                     const Text('Item details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
 
@@ -362,11 +359,32 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    // 1. MAIN CATEGORY DROPDOWN
                     DropdownButtonFormField<String>(
                       value: _selectedCategory,
                       decoration: const InputDecoration(labelText: 'Category *', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
                       items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _selectedCategory = v!),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() {
+                            _selectedCategory = v;
+                            _selectedSubCategory = _currentSubCategories.first;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 2. DYNAMIC SUB-CATEGORY DROPDOWN (Matches YAGA exactly!)
+                    DropdownButtonFormField<String>(
+                      value: _currentSubCategories.contains(_selectedSubCategory)
+                          ? _selectedSubCategory
+                          : _currentSubCategories.first,
+                      decoration: const InputDecoration(labelText: 'Sub-Category *', filled: true, fillColor: Colors.white, border: OutlineInputBorder()),
+                      items: _currentSubCategories.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _selectedSubCategory = v);
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -398,11 +416,11 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 28),
 
-                    // --- SECTION 3: YAGA DELIVERY MATRIX ---
+                    // Delivery Matrix
                     const Text('Delivery', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     Text(
-                      'Select as many as you like. Shops with multiple options sell faster. The Buyer will cover the delivery fee when purchasing.',
+                      'Select as many as you like. Shops with multiple options sell faster. The Buyer covers delivery.',
                       style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                     ),
                     const SizedBox(height: 16),
@@ -410,7 +428,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     // 1. The Courier Guy Locker & Kiosk (Pudo)
                     _courierCard(
                       title: 'The Courier Guy Locker & Kiosk',
-                      subtitle: 'We will provide you with the deposit PIN code once you are ready to ship out the order.',
+                      subtitle: 'We will provide you with the deposit PIN code once you are ready to ship.',
                       isEnabled: _enableCourierGuy,
                       onToggle: (v) => setState(() => _enableCourierGuy = v),
                       body: Column(
@@ -468,7 +486,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     // 2. Pargo Store-to-Store
                     _courierCard(
                       title: 'Pargo Store-to-Store',
-                      subtitle: 'We will provide you with the necessary Pargo PIN. Simply drop off at your nearest Pargo Point.',
+                      subtitle: 'We will provide you with the necessary Pargo PIN. Drop off at any Pargo Point.',
                       isEnabled: _enablePargo,
                       onToggle: (v) => setState(() => _enablePargo = v),
                       body: Column(
@@ -526,7 +544,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     // 3. PAXI Speed Service
                     _courierCard(
                       title: 'Paxi Speed Service',
-                      subtitle: 'We will provide you with the PAXI token and bag voucher to ship at any PEP store.',
+                      subtitle: 'We will provide you with the PAXI token and bag voucher to ship at PEP.',
                       isEnabled: _enablePaxi,
                       onToggle: (v) => setState(() => _enablePaxi = v),
                       body: Column(
@@ -554,7 +572,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // 4. Other Standard SA Couriers (With (?) Help Icons)
+                    // 4. PostNet & Pickup
                     Card(
                       elevation: 0.5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -562,20 +580,7 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                         children: [
                           SwitchListTile(
                             activeColor: const Color(0xFF008080),
-                            title: Row(
-                              children: [
-                                const Expanded(
-                                  child: Text('PostNet-to-PostNet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
-                                  tooltip: 'How PostNet works',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => DeliveryInfoSheet.show(context, 'PostNet-to-PostNet'),
-                                ),
-                              ],
-                            ),
+                            title: const Text('PostNet-to-PostNet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             subtitle: const Text('Flat rate: R 109.00'),
                             value: _enablePostNet,
                             onChanged: (v) => setState(() => _enablePostNet = v),
@@ -583,42 +588,8 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                           const Divider(height: 1),
                           SwitchListTile(
                             activeColor: const Color(0xFF008080),
-                            title: Row(
-                              children: [
-                                const Expanded(
-                                  child: Text('Aramex Store-to-Door', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
-                                  tooltip: 'How Aramex works',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => DeliveryInfoSheet.show(context, 'Aramex Store-to-Door'),
-                                ),
-                              ],
-                            ),
-                            subtitle: const Text('Flat rate: R 99.99'),
-                            value: _enableAramex,
-                            onChanged: (v) => setState(() => _enableAramex = v),
-                          ),
-                          const Divider(height: 1),
-                          SwitchListTile(
-                            activeColor: const Color(0xFF008080),
-                            title: Row(
-                              children: [
-                                const Expanded(
-                                  child: Text('Pick up from Seller (Free Collection)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
-                                  tooltip: 'How Community Pickup works safely',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => DeliveryInfoSheet.show(context, 'Local Community Pickup'),
-                                ),
-                              ],
-                            ),
-                            subtitle: const Text('Local PMB / church meetup (R 0.00)'),
+                            title: const Text('Pick up from Seller (Free Collection)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: const Text('Local PMB / community meetup (R 0.00)'),
                             value: _enablePickup,
                             onChanged: (v) => setState(() => _enablePickup = v),
                           ),
@@ -627,7 +598,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // --- SECTION 4: BUNDLING ---
                     Card(
                       elevation: 0.5,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -641,7 +611,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- SECTION 5: PRICE & 0% SELLER COMMISSION ---
                     const Text('Price', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     const Text(
@@ -668,7 +637,6 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // Submit Button
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -708,7 +676,20 @@ class _CreateListingScreenState extends State<CreateListingScreen> {
         children: [
           SwitchListTile(
             activeColor: const Color(0xFF008080),
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.help_outline, size: 18, color: Color(0xFF008080)),
+                  tooltip: 'How this courier works',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => DeliveryInfoSheet.show(context, title),
+                ),
+              ],
+            ),
             subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
             value: isEnabled,
             onChanged: onToggle,

@@ -1,7 +1,7 @@
-import 'package:community_marketplace/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/listing_model.dart';
+import '../widgets/user_avatar.dart';
 import 'listing_detail_screen.dart';
 
 class SellerShopScreen extends StatelessWidget {
@@ -39,68 +39,104 @@ class SellerShopScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- 1. Seller Header & Credibility Box ---
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
+            // Header with Real Avatar & Bio
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(sellerId).snapshots(),
+              builder: (context, userSnap) {
+                String name = shopName ?? 'Neighbor Closet';
+                String? photoUrl;
+                String suburb = 'Pietermaritzburg';
+                String bio = 'Welcome to my community wardrobe!';
+
+                if (userSnap.hasData && userSnap.data!.exists) {
+                  final data = userSnap.data!.data() as Map<String, dynamic>?;
+                  name = data?['displayName'] ?? name;
+                  photoUrl = data?['photoUrl'];
+                  suburb = data?['suburb'] ?? suburb;
+                  bio = data?['bio'] ?? bio;
+                }
+
+                return Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 34,
-                        backgroundColor: const Color(0xFF008080),
-                        child: Text(
-                          (shopName != null && shopName!.isNotEmpty)
-                              ? shopName![0].toUpperCase()
-                              : 'S',
-                          style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              shopName ?? 'Neighbor Closet',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
+                      Row(
+                        children: [
+                          UserAvatar(photoUrl: photoUrl, name: name, radius: 34),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 16),
-                                const SizedBox(width: 4),
-                                const Text(
-                                  '5.0',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                                    const SizedBox(width: 4),
+                                    const Text('5.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const SizedBox(width: 6),
+                                    Text('• $suburb', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '(14 sales)',
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE6F2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.verified, size: 12, color: Color(0xFF008080)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Verified Community Resident',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF008080),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE6F2F2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
+                          ),
+                        ],
+                      ),
+                      if (bio.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(bio, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                      ],
+                      const SizedBox(height: 16),
+                      // Bundle & Save Banner
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF008080).withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.inventory_2_outlined, color: Color(0xFF008080), size: 22),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.verified, size: 12, color: Color(0xFF008080)),
-                                  SizedBox(width: 4),
                                   Text(
-                                    'Verified Community Resident',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF008080),
-                                    ),
+                                    'Bundle & Save on Courier!',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF008080), fontSize: 13),
+                                  ),
+                                  Text(
+                                    'Buy 2 or more items from this member and pay only one single delivery fee.',
+                                    style: TextStyle(fontSize: 11, color: Colors.black87),
                                   ),
                                 ],
                               ),
@@ -110,60 +146,17 @@ class SellerShopScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // --- 2. Yaga-style "Bundle & Save" Banner ---
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [const Color(0xFF008080).withOpacity(0.08), Colors.teal.shade50],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF008080).withOpacity(0.2)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.inventory_2_outlined, color: Color(0xFF008080), size: 24),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Bundle & Save on Courier!',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF008080),
-                                  fontSize: 13,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Buy 2 or more items from this member and pay only one single delivery fee.',
-                                style: TextStyle(fontSize: 11, color: Colors.black87),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const Divider(height: 1, thickness: 1),
 
-            // --- 3. Seller's Active Closet Grid ---
+            // Closet items header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
-                  const Text(
-                    'Wardrobe & Listings',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Wardrobe & Listings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
@@ -173,16 +166,14 @@ class SellerShopScreen extends StatelessWidget {
                         .snapshots(),
                     builder: (context, snap) {
                       final count = snap.data?.docs.length ?? 0;
-                      return Text(
-                        '$count items available',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                      );
+                      return Text('$count items available', style: TextStyle(color: Colors.grey.shade600, fontSize: 13));
                     },
                   ),
                 ],
               ),
             ),
 
+            // Active Listings Grid (Opaque HitTest ensures reliable taps!)
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('listings')
@@ -206,10 +197,7 @@ class SellerShopScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.checkroom_outlined, size: 50, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        const Text(
-                          'No other active items in this closet right now.',
-                          style: TextStyle(color: Colors.black54, fontSize: 14),
-                        ),
+                        const Text('No active items in this closet right now.', style: TextStyle(color: Colors.black54, fontSize: 14)),
                       ],
                     ),
                   );
@@ -228,49 +216,63 @@ class SellerShopScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final item = ListingModel.fromFirestore(docs[index]);
-                    // Seller Shop Card with REAL Profile Photo!
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => SellerShopScreen(
-                                    sellerId: item.sellerId,
-                                    shopName: shopName,
-                                  ),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
-                              child: Row(
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque, // Ensures reliable opening
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ListingDetailScreen(listing: item),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: item.imageUrls.isNotEmpty
+                                  ? Image.network(item.imageUrls.first, fit: BoxFit.cover, width: double.infinity)
+                                  : Container(color: Colors.grey.shade200),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  UserAvatar(
-                                    photoUrl: null,
-                                    name: shopName ?? 'Neighbor Closet',
-                                    radius: 22,
+                                  Text(
+                                    'R ${item.price.toStringAsFixed(0)}',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF008080), fontSize: 15),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          shopName ?? 'Neighbor Closet',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        const Text('Verified Resident • ⭐ 5.0 Rating', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                                      ],
-                                    ),
+                                  Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                                   ),
-                                  const Icon(Icons.chevron_right, color: Colors.black45),
+                                  Text(
+                                    '${item.brand} • ${item.size}',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                  ),
                                 ],
                               ),
                             ),
-                          );
+                          ],
+                        ),
+                      ),
+                    );
                   },
                 );
               },

@@ -115,9 +115,94 @@ class YagaCategories {
       ]
     },
     {
-      'title': 'Other',
-      'icon': Icons.chair_rounded,
-      'color': Color(0xFF795548), 
+      'title': 'Electronics & Gadgets',
+      'icon': Icons.devices_other_rounded,
+      'color': Color(0xFF607D8B),
+      'sub': [
+        'Mobile Phones & Accessories',
+        'Laptops & Computers',
+        'Tablets & E-readers',
+        'Headphones & Earbuds',
+        'Smartwatches & Fitness Trackers',
+        'Cameras & Photography',
+        'Gaming Consoles & Accessories',
+      ]
+    },
+    {
+      'title': 'Sports & Outdoors',
+      'icon': Icons.sports_basketball_rounded,
+      'color': Color(0xFFFF5722),
+      'sub': [
+        'Sportswear & Activewear',
+        'Footwear for Sports',
+        'Fitness Equipment',
+        'Outdoor Gear & Camping',
+        'Bicycles & Accessories',
+        'Water Sports Equipment',
+      ]
+    },
+    {
+      'title': 'Toys & Hobbies',
+      'icon': Icons.toys_rounded,
+      'color': Color(0xFF3F51B5),
+      'sub': [
+        'Action Figures & Collectibles',
+        'Dolls & Dollhouses',
+        'Building Sets & Blocks',
+        'Arts & Crafts Supplies',
+        'Board Games & Puzzles',
+        'Remote Control Vehicles',
+      ]
+    },
+    {
+      'title': 'Books & Media',
+      'icon': Icons.book_rounded,
+      'color': Color(0xFF795548),
+      'sub': [
+        'Fiction & Literature',
+        'Non-fiction & Biographies',
+        'Children\'s Books',
+        'Educational & Textbooks',
+        'Magazines & Comics',
+        'Music CDs & Vinyl Records',
+        'Movies & TV Shows (DVD/Blu-ray)',
+      ]
+    },
+    {
+      'title': 'Health & Wellness',
+      'icon': Icons.health_and_safety_rounded,
+      'color': Color(0xFF4CAF50),
+      'sub': [
+        'Vitamins & Supplements',
+        'Fitness Equipment',
+        'Personal Care & Hygiene',
+        'Medical Supplies & Devices',
+        'Wellness & Relaxation Products',
+      ]
+    },
+    {
+      'title': 'Automotive & Vehicles',
+      'icon': Icons.directions_car_rounded,
+      'color': Color(0xFF9E9E9E),
+      'sub': [
+        'Car Accessories & Parts',
+        'Motorcycle Accessories & Parts',
+        'Bicycles & E-bikes',
+        'Car Care & Maintenance Products',
+        'Vehicle Electronics & GPS',
+      ]
+    },
+    {
+      'title': 'Travel & Experiences',
+      'icon': Icons.flight_takeoff_rounded,
+      'color': Color(0xFF00BCD4),
+      'sub': [
+        'Travel Packages & Tours',
+        'Hotel & Accommodation Deals',
+        'Adventure & Outdoor Activities',
+        'Cultural & Sightseeing Experiences',
+        'Cruises & Boat Trips',
+      ]
     },
   ];
 }
