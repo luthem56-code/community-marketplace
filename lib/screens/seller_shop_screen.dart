@@ -1,3 +1,4 @@
+import 'package:community_marketplace/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/listing_model.dart';
@@ -227,64 +228,49 @@ class SellerShopScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final item = ListingModel.fromFirestore(docs[index]);
-                    return InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ListingDetailScreen(listing: item)),
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: item.imageUrls.isNotEmpty
-                                  ? Image.network(item.imageUrls.first, fit: BoxFit.cover, width: double.infinity)
-                                  : Container(color: Colors.grey.shade200),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                    // Seller Shop Card with REAL Profile Photo!
+                          return InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SellerShopScreen(
+                                    sellerId: item.sellerId,
+                                    shopName: shopName,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'R ${item.price.toStringAsFixed(0)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF008080),
-                                      fontSize: 15,
+                                  UserAvatar(
+                                    photoUrl: null,
+                                    name: shopName ?? 'Neighbor Closet',
+                                    radius: 22,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          shopName ?? 'Neighbor Closet',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text('Verified Resident • ⭐ 5.0 Rating', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                      ],
                                     ),
                                   ),
-                                  Text(
-                                    item.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                  ),
-                                  Text(
-                                    '${item.brand} • ${item.size}',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                  ),
+                                  const Icon(Icons.chevron_right, color: Colors.black45),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    );
+                          );
                   },
                 );
               },

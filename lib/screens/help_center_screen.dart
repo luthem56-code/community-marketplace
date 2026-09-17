@@ -126,6 +126,44 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           '   • Counter: Propose an in-between price that suits both of you.\n'
           '3. Accepting an offer does not lock the item exclusively — other buyers can still purchase it at full listed price until the offer is paid for.',
     },
+    // --- DEDICATED BUYING GUIDES (NEVER EMPTY) ---
+    {
+      'title': 'How to buy safely with Escrow',
+      'category': 'Buying',
+      'icon': Icons.security_outlined,
+      'isSpecialLink': false,
+      'snippet': 'Your money is never sent directly to the seller until you approve.',
+      'content':
+          'BUYING ON THE MARKETPLACE:\n\n'
+          '1. Direct Card or Instant EFT Payment: Pay through our secure escrow checkout.\n'
+          '2. Escrow Holding: The seller does NOT receive your funds immediately. Money is locked securely in escrow.\n'
+          '3. 48-Hour Inspection Window: Once the courier delivers or you pick up locally, you have 48 hours to check the item.\n'
+          '4. Release or Dispute: If you love the item, tap "Item Received" to release the funds. If torn, counterfeit, or wrong, tap "Report an issue" to freeze the payout!',
+    },
+    {
+      'title': 'How courier pickup & smart lockers work for buyers',
+      'category': 'Buying',
+      'icon': Icons.local_shipping_outlined,
+      'isSpecialLink': false,
+      'snippet': 'Collecting from Pudo smart lockers and PEP PAXI counters.',
+      'content':
+          'COLLECTING YOUR PARCEL:\n\n'
+          '• Pudo Lockers: When your parcel lands at your chosen Pudo locker, you will receive an SMS with a one-time OTP code. Enter the code at the locker kiosk within 48 hours and the door opens.\n'
+          '• PAXI PEP Stores: Collect from your selected PEP counter nationwide. Bring your South African ID and the SMS collection PIN.\n'
+          '• Local Community Meetup: Meet the neighbor in a safe public spot. Inspect the clothes in person, then tap "Item Received" on your phone to release payment on the spot!',
+    },
+    {
+      'title': 'Making an offer below the listed price',
+      'category': 'Buying',
+      'icon': Icons.local_offer_outlined,
+      'isSpecialLink': false,
+      'snippet': 'How to negotiate discounts with sellers.',
+      'content':
+          'NEGOTIATING PRICES:\n\n'
+          '• Tap "Make Offer" on any item page to propose a reasonable lower price.\n'
+          '• If the seller accepts, your price drops on the item screen with a green savings badge!\n'
+          '• Complete checkout within 24 hours to lock in your discounted price before another buyer snatches it at full price.',
+    },
     {
       'title': 'How to spot replica & counterfeit items?',
       'category': 'Safety',

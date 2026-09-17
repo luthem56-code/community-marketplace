@@ -5,21 +5,23 @@ class DropPoint {
   final String name;
   final String type; // 'pudo', 'paxi', 'postnet', 'meetup'
   final String address;
+  final String province; // All 9 SA Provinces
   final String suburb;
-  final String details; // e.g. "24/7 Smart Locker at Engen" or "PEP Branch #4512"
+  final String details;
 
   const DropPoint({
     required this.id,
     required this.name,
     required this.type,
     required this.address,
+    required this.province,
     required this.suburb,
     required this.details,
   });
 }
 
 class DropPointMapPicker extends StatefulWidget {
-  final String initialCourierType; // 'pudo', 'paxi', 'postnet', 'meetup', 'all'
+  final String initialCourierType;
 
   const DropPointMapPicker({super.key, required this.initialCourierType});
 
@@ -31,120 +33,195 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   late String _activeType;
+  String _selectedProvince = 'All Provinces';
   DropPoint? _selectedPoint;
 
-  // Real South African & PMB drop-off lockers, PEP stores, and PostNets
+  final List<String> _saProvinces = [
+    'All Provinces',
+    'Gauteng (GP)',
+    'KwaZulu-Natal (KZN)',
+    'Western Cape (WC)',
+    'Eastern Cape (EC)',
+    'Free State (FS)',
+    'Limpopo (LP)',
+    'Mpumalanga (MP)',
+    'North West (NW)',
+    'Northern Cape (NC)',
+  ];
+
+  // Verified Nationwide Pickup & Drop-Off Points across all 9 Provinces
   final List<DropPoint> _allPoints = const [
-    // 1. PUDO LOCKERS
+    // --- KWAZULU-NATAL (KZN) ---
     DropPoint(
-      id: 'pudo_midlands',
+      id: 'kzn_pudo_midlands',
       name: 'Pudo Locker - Liberty Midlands Mall',
       type: 'pudo',
+      province: 'KwaZulu-Natal (KZN)',
       address: 'Sanctuary Road, Woodlands, PMB',
-      suburb: 'Midlands Mall',
+      suburb: 'Pietermaritzburg',
       details: '24/7 Smart Locker near Woolworths entrance',
     ),
     DropPoint(
-      id: 'pudo_cascades',
+      id: 'kzn_pudo_cascades',
       name: 'Pudo Locker - Cascades Lifestyle Centre',
       type: 'pudo',
+      province: 'KwaZulu-Natal (KZN)',
       address: '23 McCarthy Drive, Montrose, PMB',
-      suburb: 'Montrose',
-      details: '24/7 Smart Locker outside Checkers entrance',
+      suburb: 'Pietermaritzburg',
+      details: '24/7 Smart Locker outside Checkers',
     ),
     DropPoint(
-      id: 'pudo_scottsville',
-      name: 'Pudo Locker - Engen Scottsville Convenience',
-      type: 'pudo',
-      address: '50 Durban Road, Scottsville, PMB',
-      suburb: 'Scottsville',
-      details: '24/7 Smart Locker on Engen forecourt',
+      id: 'kzn_paxi_midlands',
+      name: 'PAXI PEP - Midlands Mall (Branch #4512)',
+      type: 'paxi',
+      province: 'KwaZulu-Natal (KZN)',
+      address: 'Shop 42, Midlands Mall, PMB',
+      suburb: 'Pietermaritzburg',
+      details: 'PEP Store Counter - Collect with SMS PIN & ID',
     ),
     DropPoint(
-      id: 'pudo_hayfields',
-      name: 'Pudo Locker - Hayfields Shopping Mall',
+      id: 'kzn_pudo_gateway',
+      name: 'Pudo Locker - Gateway Theatre of Shopping',
       type: 'pudo',
-      address: 'Cleland Road & Blackburrow, Hayfields, PMB',
-      suburb: 'Hayfields',
-      details: '24/7 Smart Locker next to SuperSpar',
-    ),
-    DropPoint(
-      id: 'pudo_hilton',
-      name: 'Pudo Locker - The Quarry Centre Hilton',
-      type: 'pudo',
-      address: '57 Hilton Avenue, Hilton, KZN',
-      suburb: 'Hilton',
-      details: '24/7 Smart Locker near Shell garage',
+      province: 'KwaZulu-Natal (KZN)',
+      address: '1 Palm Blvd, Umhlanga Ridge, Durban',
+      suburb: 'Durban',
+      details: '24/7 Smart Locker near entrance 3',
     ),
 
-    // 2. PAXI (PEP STORES)
+    // --- GAUTENG (GP) ---
     DropPoint(
-      id: 'paxi_midlands',
-      name: 'PAXI PEP - Liberty Midlands Mall (Branch #4512)',
-      type: 'paxi',
-      address: 'Shop 42, Midlands Mall, Sanctuary Rd',
-      suburb: 'Woodlands',
-      details: 'PEP Store Counter - Collect with SMS PIN & ID',
+      id: 'gp_pudo_mall_africa',
+      name: 'Pudo Locker - Mall of Africa',
+      type: 'pudo',
+      province: 'Gauteng (GP)',
+      address: 'Magwa Cres, Midrand, Johannesburg',
+      suburb: 'Johannesburg',
+      details: '24/7 Smart Locker at lower level parking',
     ),
     DropPoint(
-      id: 'paxi_victoria',
-      name: 'PAXI PEP - Victoria Road (Branch #1209)',
+      id: 'gp_paxi_sandton',
+      name: 'PAXI PEP - Sandton City (Branch #2201)',
       type: 'paxi',
-      address: '240 Victoria Road, PMB Central',
-      suburb: 'PMB Central',
-      details: 'PEP Store Counter - Collect with SMS PIN & ID',
+      province: 'Gauteng (GP)',
+      address: 'Rivonia Rd, Sandhurst, Sandton',
+      suburb: 'Johannesburg',
+      details: 'PEP Counter - SMS PIN & ID Required',
     ),
     DropPoint(
-      id: 'paxi_church',
-      name: 'PAXI PEP - Church Street (Branch #3081)',
-      type: 'paxi',
-      address: '380 Church Street, City Centre, PMB',
-      suburb: 'City Centre',
-      details: 'PEP Store Counter - Collect with SMS PIN & ID',
-    ),
-    DropPoint(
-      id: 'paxi_northway',
-      name: 'PAXI PEP - Northway Mall (Branch #2890)',
-      type: 'paxi',
-      address: 'Otto\'s Bluff Road, Woodlands, PMB',
-      suburb: 'Woodlands',
-      details: 'PEP Store Counter - Collect with SMS PIN & ID',
+      id: 'gp_pudo_menlyn',
+      name: 'Pudo Locker - Menlyn Park Shopping Centre',
+      type: 'pudo',
+      province: 'Gauteng (GP)',
+      address: 'Atterbury Rd, Menlyn, Pretoria',
+      suburb: 'Pretoria',
+      details: '24/7 Smart Locker near Woolworths Court',
     ),
 
-    // 3. POSTNET
+    // --- WESTERN CAPE (WC) ---
     DropPoint(
-      id: 'postnet_midlands',
-      name: 'PostNet - Midlands Mall',
-      type: 'postnet',
-      address: 'Shop 25, Liberty Midlands Mall, PMB',
-      suburb: 'Midlands Mall',
-      details: 'Counter Collection - Open Mon to Sat with ID',
+      id: 'wc_pudo_canal_walk',
+      name: 'Pudo Locker - Canal Walk Shopping Centre',
+      type: 'pudo',
+      province: 'Western Cape (WC)',
+      address: 'Century Blvd, Century City, Cape Town',
+      suburb: 'Cape Town',
+      details: '24/7 Smart Locker outside Entrance 1',
     ),
     DropPoint(
-      id: 'postnet_cascades',
-      name: 'PostNet - Cascades Centre',
-      type: 'postnet',
-      address: 'Cascades Lifestyle Centre, Montrose, PMB',
-      suburb: 'Montrose',
-      details: 'Counter Collection - Open Mon to Sat with ID',
+      id: 'wc_paxi_tygervalley',
+      name: 'PAXI PEP - Tygervalley Mall (Branch #3312)',
+      type: 'paxi',
+      province: 'Western Cape (WC)',
+      address: 'Bill Bezuidenhout Ave, Bellville',
+      suburb: 'Cape Town',
+      details: 'PEP Counter collection with PIN',
     ),
 
-    // 4. SAFE COMMUNITY MEETUP POINTS (Free R0)
+    // --- EASTERN CAPE (EC) ---
     DropPoint(
-      id: 'meetup_church',
-      name: 'PMB Central Church Community Gate',
+      id: 'ec_pudo_walmer',
+      name: 'Pudo Locker - Walmer Park Shopping Centre',
+      type: 'pudo',
+      province: 'Eastern Cape (EC)',
+      address: 'Main Rd, Walmer, Gqeberha (Port Elizabeth)',
+      suburb: 'Gqeberha',
+      details: '24/7 Smart Locker on parking deck',
+    ),
+    DropPoint(
+      id: 'ec_paxi_vincent',
+      name: 'PAXI PEP - Vincent Park (Branch #1882)',
+      type: 'paxi',
+      province: 'Eastern Cape (EC)',
+      address: 'Devereux Ave, Vincent, East London',
+      suburb: 'East London',
+      details: 'PEP Counter collection',
+    ),
+
+    // --- FREE STATE (FS) ---
+    DropPoint(
+      id: 'fs_pudo_mimosa',
+      name: 'Pudo Locker - Mimosa Mall',
+      type: 'pudo',
+      province: 'Free State (FS)',
+      address: 'Kellner St, Brandwag, Bloemfontein',
+      suburb: 'Bloemfontein',
+      details: '24/7 Smart Locker near Pick n Pay',
+    ),
+
+    // --- LIMPOPO (LP) ---
+    DropPoint(
+      id: 'lp_pudo_mall_north',
+      name: 'Pudo Locker - Mall of the North',
+      type: 'pudo',
+      province: 'Limpopo (LP)',
+      address: 'R81 & N1 Interchange, Bendor, Polokwane',
+      suburb: 'Polokwane',
+      details: '24/7 Smart Locker near entrance 2',
+    ),
+
+    // --- MPUMALANGA (MP) ---
+    DropPoint(
+      id: 'mp_pudo_ilanga',
+      name: 'Pudo Locker - iLangha Mall',
+      type: 'pudo',
+      province: 'Mpumalanga (MP)',
+      address: 'Bitterbessie St, West Acres, Mbombela (Nelspruit)',
+      suburb: 'Mbombela',
+      details: '24/7 Smart Locker at forecourt',
+    ),
+
+    // --- NORTH WEST (NW) ---
+    DropPoint(
+      id: 'nw_pudo_waterfall',
+      name: 'Pudo Locker - Waterfall Mall',
+      type: 'pudo',
+      province: 'North West (NW)',
+      address: '1 Augrabies Ave, Cashan, Rustenburg',
+      suburb: 'Rustenburg',
+      details: '24/7 Smart Locker at Shell Garage',
+    ),
+
+    // --- NORTHERN CAPE (NC) ---
+    DropPoint(
+      id: 'nc_pudo_diamond',
+      name: 'Pudo Locker - Diamond Pavilion Mall',
+      type: 'pudo',
+      province: 'Northern Cape (NC)',
+      address: 'Oliver Rd, Monument Heights, Kimberley',
+      suburb: 'Kimberley',
+      details: '24/7 Smart Locker outside Checkers',
+    ),
+
+    // --- SAFE COMMUNITY MEETUP POINTS (R0 FREE) ---
+    DropPoint(
+      id: 'pmb_meetup_central',
+      name: 'PMB Central Community Meeting Point',
       type: 'meetup',
-      address: 'Main Entrance Car Park, PMB Central',
-      suburb: 'PMB Central',
-      details: 'Public Community Meetup Spot • Safe Escrow Release',
-    ),
-    DropPoint(
-      id: 'meetup_mall_foodcourt',
-      name: 'Midlands Mall Main Food Court Entrance',
-      type: 'meetup',
-      address: 'Sanctuary Road, Public Security Booth Area',
-      suburb: 'Midlands Mall',
-      details: 'Public Community Meetup Spot • Safe Escrow Release',
+      province: 'KwaZulu-Natal (KZN)',
+      address: 'Public Safe Zone, Church / Shopping Precinct',
+      suburb: 'Pietermaritzburg',
+      details: 'Free In-Person Meetup • 100% Escrow Protected',
     ),
   ];
 
@@ -175,79 +252,106 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
   Widget build(BuildContext context) {
     final filtered = _allPoints.where((p) {
       final matchesType = _activeType == 'all' || p.type == _activeType;
+      final matchesProvince = _selectedProvince == 'All Provinces' || p.province == _selectedProvince;
       final q = _searchQuery.toLowerCase();
       final matchesQuery = _searchQuery.isEmpty ||
           p.name.toLowerCase().contains(q) ||
           p.address.toLowerCase().contains(q) ||
-          p.suburb.toLowerCase().contains(q);
-      return matchesType && matchesQuery;
+          p.suburb.toLowerCase().contains(q) ||
+          p.province.toLowerCase().contains(q);
+      return matchesType && matchesProvince && matchesQuery;
     }).toList();
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.88,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
-          // Top Handle
           Container(
             width: 40,
             height: 4,
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
           ),
-
-          // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             child: Row(
               children: [
                 const CircleAvatar(
                   backgroundColor: Color(0xFFE6F2F2),
-                  child: Icon(Icons.map_outlined, color: Color(0xFF008080)),
+                  child: Icon(Icons.location_on, color: Color(0xFF008080)),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Pick Collection Point on Map', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('Select your nearest smart locker, PEP store, or branch', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text('Select Drop-off / Pickup Point', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('All 9 South African Provinces Supported', style: TextStyle(color: Color(0xFF008080), fontSize: 11, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
           ),
           const Divider(height: 1),
 
-          // Search Bar
+          // Search + Province Selector Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (v) => setState(() => _searchQuery = v.trim()),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 20, color: Colors.black54),
-                  hintText: 'Search suburb (Scottsville, Montrose, Hilton, Midlands Mall...)',
-                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search, size: 18, color: Colors.black54),
+                        hintText: 'Search city, mall, suburb...',
+                        hintStyle: TextStyle(fontSize: 12),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _selectedProvince,
+                        style: const TextStyle(fontSize: 11, color: Colors.black, fontWeight: FontWeight.bold),
+                        items: _saProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedProvince = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -257,73 +361,15 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
-                _filterChip('all', 'All Locations'),
-                _filterChip('pudo', 'Pudo Smart Lockers'),
-                _filterChip('paxi', 'PEP PAXI Stores'),
-                _filterChip('postnet', 'PostNet Counters'),
-                _filterChip('meetup', 'Local Community Meetup'),
+                _chip('all', 'All Couriers'),
+                _chip('pudo', 'Pudo Smart Lockers'),
+                _chip('paxi', 'PEP PAXI Counters'),
+                _chip('meetup', 'Community Meetup (R0)'),
               ],
             ),
           ),
-          const SizedBox(height: 8),
 
-          // Visual Map Representation Card
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            height: 110,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.teal.shade700, const Color(0xFF004D40)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFF008080).withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 3)),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -10,
-                  bottom: -10,
-                  child: Icon(Icons.map_rounded, size: 130, color: Colors.white.withOpacity(0.08)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.gps_fixed, color: Colors.white, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            _selectedPoint != null ? 'Pin Selected!' : 'Pietermaritzburg & KZN Network',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _selectedPoint != null
-                            ? '${_selectedPoint!.name}\n${_selectedPoint!.address}'
-                            : 'Tap on any verified drop-off point below to pin it and auto-fill your delivery address.',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // List of Verified Drop Points
+          // List of Filtered Points
           Expanded(
             child: filtered.isEmpty
                 ? Center(
@@ -332,8 +378,9 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
                       children: [
                         Icon(Icons.location_off_outlined, size: 48, color: Colors.grey.shade400),
                         const SizedBox(height: 8),
-                        const Text('No pickup points found', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('Try clearing your search query.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                        Text('No drop-off points found in $_selectedProvince', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        const Text('Try selecting "All Provinces" or clearing search terms.', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       ],
                     ),
                   )
@@ -347,76 +394,45 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
                       return Card(
                         elevation: isSelected ? 2 : 0.5,
                         margin: const EdgeInsets.only(bottom: 8),
+                        color: isSelected ? const Color(0xFFE6F2F2) : Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(
-                            color: isSelected ? const Color(0xFF008080) : Colors.grey.shade200,
-                            width: isSelected ? 2.0 : 1.0,
-                          ),
+                          side: BorderSide(color: isSelected ? const Color(0xFF008080) : Colors.grey.shade200, width: isSelected ? 2 : 1),
                         ),
-                        color: isSelected ? const Color(0xFFE6F2F2) : Colors.white,
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                          onTap: () => setState(() => _selectedPoint = point),
                           leading: CircleAvatar(
-                            backgroundColor: _getIconColor(point.type).withOpacity(0.12),
-                            child: Icon(_getPointIcon(point.type), color: _getIconColor(point.type), size: 20),
+                            backgroundColor: _color(point.type).withOpacity(0.12),
+                            child: Icon(_icon(point.type), color: _color(point.type), size: 20),
                           ),
                           title: Text(point.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 2),
-                              Text(point.address, style: TextStyle(color: Colors.grey.shade700, fontSize: 11)),
-                              const SizedBox(height: 2),
-                              Text(point.details, style: const TextStyle(color: Color(0xFF008080), fontSize: 10, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                          subtitle: Text('${point.address}\n${point.province}', style: TextStyle(color: Colors.grey.shade700, fontSize: 11)),
                           trailing: Radio<String>(
                             value: point.id,
                             groupValue: _selectedPoint?.id,
                             activeColor: const Color(0xFF008080),
-                            onChanged: (_) {
-                              setState(() => _selectedPoint = point);
-                            },
+                            onChanged: (_) => setState(() => _selectedPoint = point),
                           ),
-                          onTap: () {
-                            setState(() => _selectedPoint = point);
-                          },
                         ),
                       );
                     },
                   ),
           ),
 
-          // Confirm & Auto-Fill Button
-          Container(
+          // Confirm Button
+          Padding(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -3)),
-              ],
-            ),
             child: SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF008080),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF008080), foregroundColor: Colors.white),
                 icon: const Icon(Icons.check_circle_outline),
-                label: Text(
-                  _selectedPoint != null ? 'Use This Location & Auto-Fill' : 'Select a Pin on Map',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
+                label: Text(_selectedPoint != null ? 'Use Location: ${_selectedPoint!.suburb}' : 'Select a Point Above'),
                 onPressed: _selectedPoint == null
                     ? null
                     : () {
-                        // Return selected formatted address back to checkout
-                        final formatted = '${_selectedPoint!.name}, ${_selectedPoint!.address}';
-                        Navigator.pop(context, formatted);
+                        Navigator.pop(context, '${_selectedPoint!.name}, ${_selectedPoint!.address}');
                       },
               ),
             ),
@@ -425,6 +441,25 @@ class _DropPointMapPickerState extends State<DropPointMapPicker> {
       ),
     );
   }
+
+  Widget _chip(String type, String label) {
+    final isSelected = _activeType == type;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6.0),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        selectedColor: const Color(0xFF008080),
+        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+        onSelected: (v) {
+          if (v) setState(() => _activeType = type);
+        },
+      ),
+    );
+  }
+
+  IconData _icon(String type) => type == 'pudo' ? Icons.lock_clock_outlined : (type == 'paxi' ? Icons.storefront_outlined : Icons.handshake_outlined);
+  Color _color(String type) => type == 'pudo' ? Colors.blue.shade700 : (type == 'paxi' ? Colors.orange.shade700 : const Color(0xFF008080));
 
   Widget _filterChip(String type, String label) {
     final isSelected = _activeType == type;

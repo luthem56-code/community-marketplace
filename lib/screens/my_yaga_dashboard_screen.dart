@@ -17,6 +17,8 @@ import 'edit_profile_screen.dart';
 import 'seller_discount_codes_screen.dart';
 import 'admin_dashboard_screen.dart';
 import '../services/admin_service.dart';
+import 'seller_offers_screen.dart';
+import '../widgets/user_avatar.dart';
 
 class MyYagaDashboardScreen extends StatefulWidget {
   const MyYagaDashboardScreen({super.key});
@@ -190,10 +192,7 @@ class _MyYagaDashboardScreenState extends State<MyYagaDashboardScreen> {
                       CircleAvatar(
                         radius: 32,
                         backgroundColor: const Color(0xFF008080),
-                        child: Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'M',
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
+                        child: UserAvatar(photoUrl: user.photoURL, name: displayName, radius: 32),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -373,6 +372,14 @@ class _MyYagaDashboardScreenState extends State<MyYagaDashboardScreen> {
                         subtitle: 'Create promo codes to share on WhatsApp',
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerDiscountCodesScreen())),
                       ),
+                      _menuTile(
+                    icon: Icons.local_offer,
+                    title: 'Offers Received (Pending Approval)',
+                    subtitle: 'Accept or decline price negotiations',
+                    badge: 'OFFERS',
+                    badgeColor: Colors.orange,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerOffersScreen())),
+                  ),
                     ],
                   ),
                 ),
